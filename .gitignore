@@ -1,0 +1,10 @@
+# Opencode Portable Git Ignore
+data/
+worktree/
+.opencode/worktrees/
+config/opencode.json
+*.log
+.gemini/
+.local/
+.cache/
+.config/
