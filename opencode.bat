@@ -19,15 +19,18 @@ if defined USERPROFILE (
 
 if not exist "%OPENCODE_BIN%" mkdir "%OPENCODE_BIN%"
 if not exist "%OPENCODE_BIN%\opencode.exe" (
-    echo [INFO] opencode.exe nao encontrado. Baixando o binario oficial...
-    curl -L -o "%OPENCODE_BIN%\opencode.exe" "https://opencode.ai/install.exe"
+    echo [INFO] opencode.exe nao encontrado. Baixando o pacote oficial da versao 1.16.2...
+    powershell -Command "[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12; Invoke-WebRequest -Uri 'https://github.com/anomalyco/opencode/releases/download/v1.16.2/opencode-windows-x64.zip' -OutFile '%OPENCODE_BIN%\opencode.zip'"
     if !errorlevel! neq 0 (
-        echo [INFO] Tentando link alternativo de download...
-        curl -L -o "%OPENCODE_BIN%\opencode.exe" "https://github.com/anomalyco/opencode/releases/latest/download/opencode-windows-amd64.exe"
+        echo [ERRO] Falha ao baixar o arquivo zip do opencode.
+        pause
+        exit /b 1
     )
+    echo [INFO] Extraindo executavel...
+    powershell -Command "Expand-Archive -Path '%OPENCODE_BIN%\opencode.zip' -DestinationPath '%OPENCODE_BIN%' -Force"
+    del "%OPENCODE_BIN%\opencode.zip"
     if not exist "%OPENCODE_BIN%\opencode.exe" (
-        echo [ERRO] Falha ao baixar o opencode.exe automaticamente.
-        echo Baixe manualmente de https://opencode.ai e coloque em %OPENCODE_BIN%\opencode.exe
+        echo [ERRO] opencode.exe nao foi encontrado apos extrair o ZIP.
         pause
         exit /b 1
     )
