@@ -17,10 +17,21 @@ if defined USERPROFILE (
     if exist "%SCOOP_SHIMS%" set "PATH=%SCOOP_SHIMS%;%PATH%"
 )
 
+if not exist "%OPENCODE_BIN%" mkdir "%OPENCODE_BIN%"
 if not exist "%OPENCODE_BIN%\opencode.exe" (
-    echo [ERRO] opencode.exe nao encontrado
-    pause
-    exit /b 1
+    echo [INFO] opencode.exe nao encontrado. Baixando o binario oficial...
+    curl -L -o "%OPENCODE_BIN%\opencode.exe" "https://opencode.ai/install.exe"
+    if errorlevel 1 (
+        echo [INFO] Tentando link alternativo de download...
+        curl -L -o "%OPENCODE_BIN%\opencode.exe" "https://github.com/anomalyco/opencode/releases/latest/download/opencode-windows-amd64.exe"
+    )
+    if not exist "%OPENCODE_BIN%\opencode.exe" (
+        echo [ERRO] Falha ao baixar o opencode.exe automaticamente.
+        echo Baixe manualmente de https://opencode.ai e coloque em %OPENCODE_BIN%\opencode.exe
+        pause
+        exit /b 1
+    )
+    echo [OK] opencode.exe instalado com sucesso.
 )
 
 if not exist "%OPENCODE_DATA%" mkdir "%OPENCODE_DATA%"
