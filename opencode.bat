@@ -21,7 +21,7 @@ if not exist "%OPENCODE_BIN%" mkdir "%OPENCODE_BIN%"
 if not exist "%OPENCODE_BIN%\opencode.exe" (
     echo [INFO] opencode.exe nao encontrado. Baixando o binario oficial...
     curl -L -o "%OPENCODE_BIN%\opencode.exe" "https://opencode.ai/install.exe"
-    if errorlevel 1 (
+    if !errorlevel! neq 0 (
         echo [INFO] Tentando link alternativo de download...
         curl -L -o "%OPENCODE_BIN%\opencode.exe" "https://github.com/anomalyco/opencode/releases/latest/download/opencode-windows-amd64.exe"
     )
