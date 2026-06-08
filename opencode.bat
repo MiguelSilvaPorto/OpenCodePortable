@@ -21,7 +21,7 @@ if not exist "%OPENCODE_BIN%" mkdir "%OPENCODE_BIN%"
 if exist "%OPENCODE_BIN%\opencode.exe" (
     for %%I in ("%OPENCODE_BIN%\opencode.exe") do set "FILE_SIZE=%%~zI"
     if !FILE_SIZE! lss 10000000 (
-        echo [WARN] opencode.exe esta corrompido ou incompleto (tamanho: !FILE_SIZE! bytes).
+        echo [WARN] opencode.exe esta corrompido ou incompleto, tamanho: !FILE_SIZE! bytes.
         echo        Apagando e baixando novamente...
         del "%OPENCODE_BIN%\opencode.exe"
     )
