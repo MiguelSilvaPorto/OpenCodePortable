@@ -48,6 +48,17 @@ if not exist "%OPENCODE_BIN%\opencode.exe" (
 if not exist "%OPENCODE_DATA%" mkdir "%OPENCODE_DATA%"
 if not exist "%OPENCODE_CONFIG_DIR%" mkdir "%OPENCODE_CONFIG_DIR%"
 
+:: Verificar se as dependencias do Office estao instaladas, senao forca o setup a rodar
+where python >nul 2>&1
+if %errorlevel% == 0 (
+    python -c "import openpyxl, docx, pptx, mcp, win32com.client" >nul 2>&1
+    if !errorlevel! neq 0 (
+        if exist "%FIRST_RUN%" del "%FIRST_RUN%"
+    )
+) else (
+    if exist "%FIRST_RUN%" del "%FIRST_RUN%"
+)
+
 if exist "%FIRST_RUN%" goto :start
 
 echo.
@@ -58,7 +69,7 @@ echo.
 
 set "SETUP_OK=1"
 
-echo [1/5] Scoop...
+echo [1/6] Scoop...
 where scoop >nul 2>&1
 if %errorlevel% neq 0 (
     echo       Nao encontrado. Instalando Scoop automaticamente...
@@ -75,7 +86,7 @@ if %errorlevel% neq 0 (
 )
 
 if "!SETUP_OK!"=="1" (
-    echo [2/5] Adicionando bucket 'extras' no Scoop...
+    echo [2/6] Adicionando bucket 'extras' no Scoop...
     call scoop bucket list | findstr /i "extras" >nul 2>&1
     if !errorlevel! neq 0 (
         echo       Adicionando extras bucket...
@@ -90,7 +101,7 @@ if "!SETUP_OK!"=="1" (
 )
 
 if "!SETUP_OK!"=="1" (
-    echo [3/5] whisper-cpp...
+    echo [3/6] whisper-cpp...
     where whisper-cli >nul 2>&1
     if !errorlevel! neq 0 (
         echo       Instalando whisper-cpp...
@@ -105,7 +116,7 @@ if "!SETUP_OK!"=="1" (
 )
 
 if "!SETUP_OK!"=="1" (
-    echo [4/5] sox...
+    echo [4/6] sox...
     where sox >nul 2>&1
     if !errorlevel! neq 0 (
         echo       Instalando sox...
@@ -119,7 +130,7 @@ if "!SETUP_OK!"=="1" (
     )
 )
 
-echo [5/5] Modelo whisper...
+echo [5/6] Modelo whisper...
 if exist "%MODELS_DIR%\ggml-base.bin" (
     echo       OK
 ) else (
@@ -129,6 +140,34 @@ if exist "%MODELS_DIR%\ggml-base.bin" (
     if !errorlevel! neq 0 (
         echo       [ERRO] Falha ao baixar modelo
         set "SETUP_OK=0"
+    )
+)
+
+if "!SETUP_OK!"=="1" (
+    echo [6/6] Dependencias Office MCP (Python)...
+    where python >nul 2>&1
+    if !errorlevel! neq 0 (
+        echo       Instalando Python via Scoop...
+        call scoop install python
+        if !errorlevel! neq 0 (
+            echo       [ERRO] Falha ao instalar Python.
+            set "SETUP_OK=0"
+        )
+    ) else (
+        echo       Python OK
+    )
+    if "!SETUP_OK!"=="1" (
+        echo       Instalando bibliotecas do Office...
+        python -m pip install --upgrade pip >nul 2>&1
+        python -m pip install openpyxl python-docx python-pptx pywin32 mcp >nul 2>&1
+        :: Nao falha o setup caso ocorra apenas warnings de conflito se os pacotes funcionarem
+        python -c "import openpyxl, docx, pptx, mcp, win32com.client" >nul 2>&1
+        if !errorlevel! neq 0 (
+            echo       [ERRO] Falha ao instalar dependencias do Python.
+            set "SETUP_OK=0"
+        ) else (
+            echo       OK
+        )
     )
 )
 
