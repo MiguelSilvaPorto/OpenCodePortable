@@ -53,31 +53,27 @@ set "SETUP_OK=1"
 echo [1/5] Scoop...
 where scoop >nul 2>&1
 if %errorlevel% neq 0 (
-    echo       Nao encontrado - Execute: scripts\install-voice.bat
-    set "SETUP_OK=0"
+    echo       Nao encontrado. Instalando Scoop automaticamente...
+    powershell -Command "Set-ExecutionPolicy RemoteSigned -Scope CurrentUser -Force; [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12; Invoke-RestMethod -Uri https://get.scoop.sh | Invoke-Expression"
+    if !errorlevel! neq 0 (
+        echo       [ERRO] Falha ao instalar o Scoop.
+        set "SETUP_OK=0"
+    ) else (
+        echo       [OK] Scoop instalado com sucesso.
+        set "PATH=%USERPROFILE%\scoop\shims;%PATH%"
+    )
 ) else (
     echo       OK
+)
 
-    echo [2/5] whisper-cpp...
-    where whisper-cli >nul 2>&1
-    if %errorlevel% neq 0 (
-        echo       Instalando...
-        call scoop install whisper-cpp
+if "!SETUP_OK!"=="1" (
+    echo [2/5] Adicionando bucket 'extras' no Scoop...
+    call scoop bucket list | findstr /i "extras" >nul 2>&1
+    if !errorlevel! neq 0 (
+        echo       Adicionando extras bucket...
+        call scoop bucket add extras
         if !errorlevel! neq 0 (
-            echo       [ERRO] Falha ao instalar whisper-cpp
-            set "SETUP_OK=0"
-        )
-    ) else (
-        echo       OK
-    )
-
-    echo [3/5] sox...
-    where sox >nul 2>&1
-    if %errorlevel% neq 0 (
-        echo       Instalando...
-        call scoop install sox
-        if !errorlevel! neq 0 (
-            echo       [ERRO] Falha ao instalar sox
+            echo       [ERRO] Falha ao adicionar bucket extras.
             set "SETUP_OK=0"
         )
     ) else (
@@ -85,7 +81,37 @@ if %errorlevel% neq 0 (
     )
 )
 
-echo [4/5] Modelo whisper...
+if "!SETUP_OK!"=="1" (
+    echo [3/5] whisper-cpp...
+    where whisper-cli >nul 2>&1
+    if !errorlevel! neq 0 (
+        echo       Instalando whisper-cpp...
+        call scoop install whisper-cpp
+        if !errorlevel! neq 0 (
+            echo       [ERRO] Falha ao instalar whisper-cpp.
+            set "SETUP_OK=0"
+        )
+    ) else (
+        echo       OK
+    )
+)
+
+if "!SETUP_OK!"=="1" (
+    echo [4/5] sox...
+    where sox >nul 2>&1
+    if !errorlevel! neq 0 (
+        echo       Instalando sox...
+        call scoop install sox
+        if !errorlevel! neq 0 (
+            echo       [ERRO] Falha ao instalar sox.
+            set "SETUP_OK=0"
+        )
+    ) else (
+        echo       OK
+    )
+)
+
+echo [5/5] Modelo whisper...
 if exist "%MODELS_DIR%\ggml-base.bin" (
     echo       OK
 ) else (
@@ -98,7 +124,7 @@ if exist "%MODELS_DIR%\ggml-base.bin" (
     )
 )
 
-echo [5/5] Ollama...
+echo [Opcional] Ollama...
 where ollama >nul 2>&1
 if %errorlevel% neq 0 (
     echo       Nao encontrado - https://ollama.com
@@ -106,8 +132,11 @@ if %errorlevel% neq 0 (
     echo       OK
 )
 
-if not exist "%OPENCODE_CONFIG%" (
-    >"%OPENCODE_CONFIG%" (
+:: Configurar o plugin de voz em opencode.jsonc se nao estiver configurado
+findstr /i "@renjfk/opencode-voice" "%OPENCODE_CONFIG%" >nul 2>&1
+if %errorlevel% neq 0 (
+    echo Configurando plugin de voz em opencode.jsonc...
+    (
         echo {
         echo   "$schema": "https://opencode.ai/config.json",
         echo   "plugin": [
@@ -117,11 +146,13 @@ if not exist "%OPENCODE_CONFIG%" (
         echo     }]
         echo   ]
         echo }
-    )
-    echo Configuracao criada
+    ) > "%OPENCODE_CONFIG%"
+    echo Configuracao atualizada!
 )
 
-type nul > "%FIRST_RUN%"
+if "!SETUP_OK!"=="1" (
+    type nul > "%FIRST_RUN%"
+)
 
 echo.
 echo ============================================
@@ -134,4 +165,10 @@ if "%~1"=="" pause
 
 :start
 set "OPENCODE_DISABLE_PROJECT_CONFIG=1"
+echo [INFO] Iniciando opencode.exe...
 "%OPENCODE_BIN%\opencode.exe" %*
+if %errorlevel% neq 0 (
+    echo.
+    echo [ERRO] O OpenCode encerrou com o codigo de erro: %errorlevel%
+    pause
+)
