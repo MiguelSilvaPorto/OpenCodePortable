@@ -26,3 +26,6 @@ bin/opencode.exe
 .local/
 .cache/
 .config/
+
+# Multitask worktrees
+multitask-worktrees/

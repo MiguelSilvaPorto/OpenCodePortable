@@ -211,6 +211,10 @@ echo.
 if "%~1"=="" pause
 
 :start
+:: Garantir que multitask-worktrees seja uma juncao limpa apontando para a pasta TEMP para evitar erro de recursao do multitask agent
+if exist "multitask-worktrees" rmdir /s /q "multitask-worktrees"
+if not exist "%TEMP%\opencode-worktrees" mkdir "%TEMP%\opencode-worktrees"
+mklink /j "multitask-worktrees" "%TEMP%\opencode-worktrees" >nul 2>&1
 set "OPENCODE_DISABLE_PROJECT_CONFIG=1"
 echo [INFO] Iniciando opencode.exe...
 "%OPENCODE_BIN%\opencode.exe" %*
