@@ -5,5 +5,12 @@
       "endpoint": "http://localhost:11434/v1",
       "model": "llama3.2"
     }]
-  ]
+  ],
+  "mcp": {
+    "office-mcp": {
+      "type": "local",
+      "command": ["python", "scripts/office_mcp.py"],
+      "enabled": true
+    }
+  }
 }
