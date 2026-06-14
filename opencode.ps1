@@ -647,12 +647,21 @@ if (Test-Path $scoopShims) {
 # Iniciar logs
 Ensure-LogDir
 Rotate-Logs
+
+# Disparar o monitor de logs exclusivo em background de forma transparente
+$monitorScript = Join-Path $OPENCODE_HOME "scripts\opencode-monitor.ps1"
+if (Test-Path $monitorScript) {
+    $argList = "-NoProfile -ExecutionPolicy Bypass -File `"$monitorScript`" -LogDir `"$LOG_DIR`" -OpenCodeHome `"$OPENCODE_HOME`""
+    Start-Process powershell.exe -ArgumentList $argList -WindowStyle Hidden
+}
+
 Write-Log "SYSTEM" "START" @{
     ps_version = $PSVersionTable.PSVersion.ToString()
     os = if ($IsWindows) { "Windows" } elseif ($IsLinux) { "Linux" } else { "macOS" }
     pid = $PID
     args = if ($Arguments) { $Arguments -join " " } else { "" }
 }
+
 
 # Garantir diretorios
 if (-not (Test-Path $OPENCODE_BIN))  { New-Item -ItemType Directory -Path $OPENCODE_BIN -Force | Out-Null }

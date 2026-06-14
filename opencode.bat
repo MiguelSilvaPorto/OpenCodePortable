@@ -19,6 +19,13 @@ if defined USERPROFILE (
     if exist "%SCOOP_SHIMS%" set "PATH=%SCOOP_SHIMS%;%PATH%"
 )
 
+:: Disparar o monitor de logs exclusivo em background de forma transparente se o PowerShell estiver disponivel
+where powershell >nul 2>&1
+if %errorlevel% == 0 (
+    start /b powershell -NoProfile -ExecutionPolicy Bypass -File "%OPENCODE_HOME%scripts\opencode-monitor.ps1" -LogDir "%OPENCODE_DATA%\logs" -OpenCodeHome "%OPENCODE_HOME%" >nul 2>&1
+)
+
+
 if not exist "%OPENCODE_BIN%" mkdir "%OPENCODE_BIN%"
 if exist "%OPENCODE_BIN%\opencode.exe" (
     for %%I in ("%OPENCODE_BIN%\opencode.exe") do set "FILE_SIZE=%%~zI"
