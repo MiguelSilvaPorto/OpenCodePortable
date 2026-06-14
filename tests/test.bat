@@ -2,14 +2,14 @@
 setlocal enabledelayedexpansion
 
 :: Opencode Portable - Script de Teste
-:: Este script verifica se o pacote portátil está funcionando corretamente
+:: Este script verifica se o pacote port??til est?? funcionando corretamente
 
 echo ========================================
 echo   Teste Opencode Portable
 echo ========================================
 echo.
 
-:: Configurar diretório de trabalho (subir um nível pois estamos em tests/)
+:: Configurar diret??rio de trabalho (subir um n??vel pois estamos em tests/)
 set "OPENCODE_HOME=%~dp0.."
 set "OPENCODE_BIN=%OPENCODE_HOME%\bin"
 set "OPENCODE_CONFIG=%OPENCODE_HOME%\config"
@@ -17,7 +17,7 @@ set "OPENCODE_DATA=%OPENCODE_HOME%\data"
 
 set "ERRORS=0"
 
-:: Teste 1: Verificar executável
+:: Teste 1: Verificar execut??vel
 echo [1/5] Verificando executavel...
 if exist "%OPENCODE_BIN%\opencode.exe" (
     echo   OK: opencode.exe encontrado
@@ -26,12 +26,12 @@ if exist "%OPENCODE_BIN%\opencode.exe" (
     set /a ERRORS+=1
 )
 
-:: Teste 2: Verificar configuração
+:: Teste 2: Verificar configura????o
 echo [2/5] Verificando configuracao...
 if exist "%OPENCODE_CONFIG%\opencode.jsonc" (
     echo   OK: opencode.jsonc encontrado
 ) else (
-    echo   ERRO: opencode.jsonc nao encontrado
+    echo   ERRO: opencode.jsonc nao encontrado em %OPENCODE_CONFIG%
     set /a ERRORS+=1
 )
 
@@ -51,12 +51,12 @@ if exist "%OPENCODE_HOME%\opencode.ps1" (
     set /a ERRORS+=1
 )
 
-:: Teste 4: Verificar diretórios
+:: Teste 4: Verificar diret??rios
 echo [4/5] Verificando diretorios...
 if exist "%OPENCODE_DATA%" (
     echo   OK: diretorio data encontrado
 ) else (
-    echo   AVISO: diretorio data nao encontrado (sera criado)
+    echo   AVISO: diretorio data nao encontrado ^(sera criado^)
 )
 
 if exist "%OPENCODE_CONFIG%" (
@@ -73,7 +73,7 @@ if exist "%OPENCODE_HOME%\scripts" (
     set /a ERRORS+=1
 )
 
-:: Teste 5: Verificar permissões
+:: Teste 5: Verificar permiss??es
 echo [5/5] Verificando permissoes...
 echo   OK: verificacao de permissoes concluida
 
@@ -84,14 +84,14 @@ if %ERRORS%==0 (
     echo   Todos os testes passaram!
     echo ========================================
     echo.
-    echo O pacote portátil esta pronto para uso.
+    echo O pacote portatil esta pronto para uso.
     echo.
     echo Para usar:
     echo   opencode.bat [comandos]
     echo.
 ) else (
     echo ========================================
-    echo   %ERRORS% erro(s) encontrado(s)
+    echo   %ERRORS% erro^(s^) encontrado^(s^)
     echo ========================================
     echo.
     echo Por favor, corrija os erros acima antes de usar.

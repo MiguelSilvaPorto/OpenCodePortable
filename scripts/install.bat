@@ -29,11 +29,13 @@ if not exist "%OPENCODE_CONFIG%" mkdir "%OPENCODE_CONFIG%"
 if not exist "%OPENCODE_DATA%" mkdir "%OPENCODE_DATA%"
 
 :: Criar arquivo de configuração padrão se não existir
-if not exist "%OPENCODE_CONFIG%\opencode.jsonc" (
+set "OPENCODE_CONFIG_FILE=%OPENCODE_CONFIG%\opencode\opencode.jsonc"
+if not exist "%OPENCODE_CONFIG_FILE%" (
+    if not exist "%OPENCODE_CONFIG%\opencode" mkdir "%OPENCODE_CONFIG%\opencode"
     echo Criando arquivo de configuracao padrao...
-    echo { > "%OPENCODE_CONFIG%\opencode.jsonc"
-    echo   "$schema": "https://opencode.ai/config.json" >> "%OPENCODE_CONFIG%\opencode.jsonc"
-    echo } >> "%OPENCODE_CONFIG%\opencode.jsonc"
+    echo { > "%OPENCODE_CONFIG_FILE%"
+    echo   "$schema": "https://opencode.ai/config.json" >> "%OPENCODE_CONFIG_FILE%"
+    echo } >> "%OPENCODE_CONFIG_FILE%"
 )
 
 :: Criar atalho na área de trabalho (opcional)
@@ -43,15 +45,23 @@ if /i "%CREATE_SHORTCUT%"=="S" (
     powershell -Command "$ws = New-Object -ComObject WScript.Shell; $shortcut = $ws.CreateShortcut('%USERPROFILE%\Desktop\Opencode Portable.lnk'); $shortcut.TargetPath = '%OPENCODE_HOME%\opencode.bat'; $shortcut.WorkingDirectory = '%OPENCODE_HOME%'; $shortcut.Save()"
 )
 
+:: Adicionar ao PATH (opcional)
+set /p ADD_PATH="Deseja poder digitar 'opencode' no terminal de qualquer lugar? (S/N): "
+if /i "%ADD_PATH%"=="S" (
+    echo Adicionando ao PATH do usuario...
+    powershell -ExecutionPolicy Bypass -File "%OPENCODE_HOME%\scripts\add-to-path.ps1"
+)
+
 echo.
 echo ========================================
 echo   Instalacao concluida!
 echo ========================================
 echo.
 echo Para usar o Opencode Portable:
-echo 1. Navegue ate o diretorio: %OPENCODE_HOME%
-echo 2. Execute: opencode.bat
+echo 1. Digite 'opencode' no terminal (se adicionou ao PATH)
+echo 2. Ou execute: opencode.bat
+echo 3. Ou use o atalho na area de trabalho.
 echo.
-echo Ou crie um atalho na area de trabalho.
+echo Toda configuracao fica dentro do projeto portatil!
 echo.
 pause

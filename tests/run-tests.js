@@ -41,10 +41,11 @@ assert.strictEqual(run1.status, 0, 'Help command should exit with code 0');
 
 console.log('Verifying local database creation...');
 assert(fs.existsSync(testDataDir), 'Local data/ directory should be created');
-const files = fs.readdirSync(testDataDir);
-console.log('Created files in data/:', files);
-const dbExists = files.some(f => f.startsWith('opencode-dev.db'));
-assert(dbExists, 'Database file should be initialized inside data/');
+const dbDir = path.join(testDataDir, 'opencode');
+const dbFiles = fs.existsSync(dbDir) ? fs.readdirSync(dbDir) : [];
+console.log('Created files in data/opencode/:', dbFiles);
+const dbExists = dbFiles.some(f => f.startsWith('opencode.db'));
+assert(dbExists, 'Database file should be initialized inside data/opencode/');
 console.log('Test 1 Passed: All session, logs, and database files are isolated locally.');
 
 // Test 2: Agent Division Validation

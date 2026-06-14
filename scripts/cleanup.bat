@@ -3,6 +3,7 @@ setlocal enabledelayedexpansion
 
 :: Opencode Portable - Script de Limpeza
 :: Este script limpa dados temporários e cache
+:: Agora opera em data\opencode\ (runtime data do XDG)
 
 echo ========================================
 echo   Limpeza Opencode Portable
@@ -11,7 +12,7 @@ echo.
 
 :: Configurar diretório de trabalho (subir um nível pois estamos em scripts/)
 set "OPENCODE_HOME=%~dp0.."
-set "OPENCODE_DATA=%OPENCODE_HOME%\data"
+set "OPENCODE_DATA=%OPENCODE_HOME%\data\opencode"
 
 echo Diretorio de dados: %OPENCODE_DATA%
 echo.

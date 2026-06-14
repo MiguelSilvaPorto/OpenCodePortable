@@ -25,8 +25,12 @@ echo [1/2] Atualizando pip...
 python -m pip install --upgrade pip
 
 echo.
-echo [2/2] Instalando bibliotecas de manipulacao de documentos e MCP...
+echo [2/3] Instalando bibliotecas base de manipulacao de documentos e MCP...
 python -m pip install openpyxl python-docx python-pptx pywin32 mcp
+
+echo.
+echo [3/3] Instalando bibliotecas avancadas (PowerPoint animacoes, Excel PivotTable, Track Changes, PDF, OCR, criptografia)...
+python -m pip install power-pptx excelize dumont docx-revisions PyMuPDF easyocr msoffcrypto-tool
 
 if !errorlevel! neq 0 (
     echo [ERRO] Falha ao instalar dependencias via pip.
