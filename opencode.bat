@@ -565,6 +565,17 @@ if not exist "%USERPROFILE%\.config\opencode\tui.json" (
     call :create_tui_json
 )
 
+:: 10. Corrigir filtro de dispositivos de audio no voice plugin
+set "STT_FILE=%USERPROFILE%\.cache\opencode\packages\@renjfk\opencode-voice@latest\node_modules\@renjfk\opencode-voice\lib\stt.js"
+if exist "%STT_FILE%" (
+    findstr /c:"includes(\"audio\")" "%STT_FILE%" >nul 2>&1
+    if errorlevel 1 (
+        echo [HEALTH] Corrigindo filtro de dispositivos de audio...
+        powershell -NoProfile -Command "$f='%STT_FILE%'; $c=Get-Content $f -Raw; $c=$c.Replace('l.toLowerCase().includes(\"micro\")','l.toLowerCase().includes(\"micro\") || l.toLowerCase().includes(\"audio\") || l.toLowerCase().includes(\"usb\") || l.toLowerCase().includes(\"input\")'); Set-Content $f $c -NoNewline -Encoding UTF8"
+        echo [HEALTH] OK: Filtro de dispositivos corrigido
+    )
+)
+
 goto :eof
 
 :create_tui_json
