@@ -415,7 +415,14 @@ if errorlevel 1 goto :eof
 call az account show >nul 2>&1
 if not errorlevel 1 (
     echo       Azure CLI ja autenticado.
-    goto :eof
+goto :eof
+
+:: ============================================
+:: Sub-rotina: Criar tui.json do voice plugin
+:: ============================================
+:create_tui_json
+powershell -NoProfile -Command "Set-Content -Path \"$env:USERPROFILE\.config\opencode\tui.json\" -Value '{\"`$schema\":\"https://opencode.ai/tui.json\",\"plugin\":[[\"@renjfk/opencode-voice\",{\"endpoint\":\"https://api.groq.com/openai/v1\",\"model\":\"llama-3.1-8b-instant\",\"apiKeyEnv\":\"GROQ_API_KEY\",\"apiKey\":\"***REMOVED***\",\"retries\":2,\"sttPrompt\":\"Voce e um robo de limpeza de transcricao de voz. Sua tarefa e APENAS remover gagueiras, palavras repetidas e hesitacoes. Voce NUNCA deve resumir, NUNCA deve encurtar e NUNCA deve alterar a frase do usuario. Mantenha todas as informacoes originais. Responda APENAS com o texto limpo, sem aspas, sem explicacoes e mantendo a frase inteira sem encurtar.\"}]]}' -Encoding UTF8"
+goto :eof
 )
 echo       Voce nao esta autenticado no Azure.
 set /p AZ_LOGIN_NOW="      Deseja realizar o 'az login' agora? (S/N): "
@@ -558,7 +565,7 @@ if not exist "%USERPROFILE%\.config\opencode" mkdir "%USERPROFILE%\.config\openc
 :: Criar tui.json global (OpenCode le daqui para plugins TUI)
 if not exist "%USERPROFILE%\.config\opencode\tui.json" (
     echo [HEALTH] Criando configuracao do voice plugin (global)...
-    powershell -NoProfile -Command "$j = @{ '$schema' = 'https://opencode.ai/tui.json'; plugin = @(@( '@renjfk/opencode-voice', @{ endpoint = 'https://api.groq.com/openai/v1'; model = 'llama-3.1-8b-instant'; apiKeyEnv = 'GROQ_API_KEY'; apiKey = '***REMOVED***'; retries = 2; sttPrompt = 'Voce e um robo de limpeza de transcricao de voz. Sua tarefa e APENAS remover gagueiras, palavras repetidas e hesitacoes. Voce NUNCA deve resumir, NUNCA deve encurtar e NUNCA deve alterar a frase do usuario. Mantenha todas as informacoes originais. Responda APENAS com o texto limpo, sem aspas, sem explicacoes e mantendo a frase inteira sem encurtar.' })) } | ConvertTo-Json -Depth 5 | Set-Content '%USERPROFILE%\.config\opencode\tui.json' -Encoding UTF8"
+    call :create_tui_json
     echo [HEALTH] OK: tui.json global criado
 )
 
