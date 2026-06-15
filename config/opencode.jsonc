@@ -1,34 +1,34 @@
-{
-    "$schema": "https://opencode.ai/config.json",
-    "plugin": [
-        [
-            "@renjfk/opencode-voice",
-            {
-                "endpoint": "http://localhost:11434/v1",
-                "model": "llama3.2"
+﻿{
+    "$schema":  "https://opencode.ai/config.json",
+    "plugin":  [
+                   [
+                       "@renjfk/opencode-voice",
+                       {
+                           "endpoint":  "http://localhost:11434/v1",
+                           "model":  "llama3.2"
+                       }
+                   ],
+                   "multitask",
+                   "multitask-tui.tsx",
+                   "workspace-tui.tsx",
+                   "auto-switch-mode.ts"
+               ],
+    "mcp":  {
+                "office-mcp":  {
+                                   "type":  "local",
+                                   "command":  [
+                                                   "python",
+                                                   "D:/Miguel/Github/Scrath/OpencodePortable/OpencodePortable/scripts/office_mcp.py"
+                                               ],
+                                   "enabled":  true
+                               },
+                "project-mcp":  {
+                                    "type":  "local",
+                                    "command":  [
+                                                    "python",
+                                                    "D:/Miguel/Github/Scrath/OpencodePortable/OpencodePortable/scripts/project_generator.py"
+                                                ],
+                                    "enabled":  true
+                                }
             }
-        ],
-        "multitask",
-        "multitask-tui.tsx",
-        "workspace-tui.tsx",
-        "auto-switch-mode.ts"
-    ],
-    "mcp": {
-        "office-mcp": {
-            "type": "local",
-            "command": [
-                "python",
-                "D:/Github/OpencodePortable/scripts/office_mcp.py"
-            ],
-            "enabled": true
-        },
-        "project-mcp": {
-            "type": "local",
-            "command": [
-                "python",
-                "D:/Github/OpencodePortable/scripts/project_generator.py"
-            ],
-            "enabled": true
-        }
-    }
 }

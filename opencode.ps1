@@ -756,6 +756,11 @@ function Invoke-OpenCode {
 # FLUXO PRINCIPAL
 # ============================================================================
 
+# Habilitar suporte completo a Unicode / UTF-8 no console do PowerShell
+$OutputEncoding = [System.Text.Encoding]::UTF8
+[Console]::InputEncoding = [System.Text.Encoding]::UTF8
+[Console]::OutputEncoding = [System.Text.Encoding]::UTF8
+
 # Configurar ambiente
 $env:PATH = "$OPENCODE_BIN;$env:PATH"
 
