@@ -138,7 +138,14 @@ if errorlevel 1 (
     if exist "%FIRST_RUN%" del "%FIRST_RUN%"
 )
 
-if exist "%FIRST_RUN%" goto :start
+:: SEMPRE executar health check (verificar dependencias)
+call :health_check
+
+:: Se marker nao existe, mostrar setup inicial completo
+if not exist "%FIRST_RUN%" goto :setup_initial
+goto :start
+
+:setup_initial
 
 echo.
 echo ============================================
@@ -433,4 +440,115 @@ echo !_EVENT! | findstr /i "FAILED ERROR ABORTED FATAL" >nul 2>&1 && set "_LEVEL
 echo !_EVENT! | findstr /i "SUCCESS COMPLETED OK DONE" >nul 2>&1 && set "_LEVEL=SUCCESS"
 echo !_EVENT! | findstr /i "WARN FALLBACK RETRY SKIP" >nul 2>&1 && set "_LEVEL=WARN"
 >> "%LOG_FILE%" echo {"ts":"!_TS!","level":"!_LEVEL!","stage":"!_STAGE!","event":"!_EVENT!","context":{"!_CTX!"},"pid":%_PID%}
+goto :eof
+
+:: ============================================
+:: Sub-rotina: Health Check de Dependencias
+:: Verifica e instala automaticamente o que faltar
+:: Roda SEMPRE que o opencode.bat e executado
+:: ============================================
+:health_check
+set "HEALTH_OK=1"
+
+:: 1. Scoop
+where scoop >nul 2>&1
+if %errorlevel% neq 0 (
+    echo [HEALTH] Scoop nao encontrado. Instalando...
+    powershell -Command "Set-ExecutionPolicy RemoteSigned -Scope CurrentUser -Force; [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12; Invoke-RestMethod -Uri https://get.scoop.sh | Invoke-Expression"
+    if !errorlevel! neq 0 (
+        echo [HEALTH] ERRO: Falha ao instalar Scoop
+        set "HEALTH_OK=0"
+    ) else (
+        set "PATH=%USERPROFILE%\scoop\shims;%PATH%"
+        echo [HEALTH] OK: Scoop instalado
+    )
+)
+
+:: 2. whisper-cpp
+where whisper-cli >nul 2>&1
+if %errorlevel% neq 0 (
+    echo [HEALTH] whisper-cli nao encontrado. Instalando...
+    call scoop install whisper-cpp
+    if !errorlevel! neq 0 (
+        echo [HEALTH] ERRO: Falha ao instalar whisper-cpp
+        set "HEALTH_OK=0"
+    ) else (
+        echo [HEALTH] OK: whisper-cpp instalado
+    )
+)
+
+:: 3. sox
+where sox >nul 2>&1
+if %errorlevel% neq 0 (
+    echo [HEALTH] sox nao encontrado. Instalando...
+    call scoop install sox
+    if !errorlevel! neq 0 (
+        echo [HEALTH] ERRO: Falha ao instalar sox
+        set "HEALTH_OK=0"
+    ) else (
+        echo [HEALTH] OK: sox instalado
+    )
+)
+
+:: 4. Modelo Whisper
+if not exist "%MODELS_DIR%\ggml-base.bin" (
+    echo [HEALTH] Modelo Whisper nao encontrado. Baixando...
+    if not exist "%MODELS_DIR%" mkdir "%MODELS_DIR%"
+    curl -L -o "%MODELS_DIR%\ggml-base.bin" "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-base.bin"
+    if !errorlevel! neq 0 (
+        echo [HEALTH] ERRO: Falha ao baixar modelo
+        set "HEALTH_OK=0"
+    ) else (
+        echo [HEALTH] OK: Modelo Whisper baixado
+    )
+)
+
+:: 5. Python
+where python >nul 2>&1
+if %errorlevel% neq 0 (
+    echo [HEALTH] Python nao encontrado. Instalando...
+    call scoop install python
+    if !errorlevel! neq 0 (
+        echo [HEALTH] ERRO: Falha ao instalar Python
+        set "HEALTH_OK=0"
+    ) else (
+        echo [HEALTH] OK: Python instalado
+    )
+)
+
+:: 6. Bibliotecas Python
+python -c "import openpyxl, docx, pptx, mcp, win32com.client, psutil, formulas, msal, pdf2image, lxml" >nul 2>&1
+if %errorlevel% neq 0 (
+    echo [HEALTH] Bibliotecas Python incompletas. Instalando...
+    python -m pip install --upgrade pip >nul 2>&1
+    python -m pip install openpyxl python-docx python-pptx pywin32 mcp psutil formulas msal pdf2image lxml >nul 2>&1
+    python -c "import openpyxl, docx, pptx, mcp, win32com.client, psutil, formulas, msal, pdf2image, lxml" >nul 2>&1
+    if !errorlevel! neq 0 (
+        echo [HEALTH] ERRO: Falha ao instalar bibliotecas
+        set "HEALTH_OK=0"
+    ) else (
+        echo [HEALTH] OK: Bibliotecas Python instaladas
+    )
+)
+
+:: 7. Azure CLI (opcional)
+where az >nul 2>&1
+if %errorlevel% neq 0 (
+    echo [HEALTH] Azure CLI nao encontrado. Instalando...
+    call scoop install azure-cli
+    if !errorlevel! neq 0 (
+        echo [HEALTH] AVISO: Falha ao instalar Azure CLI (opcional)
+    ) else (
+        echo [HEALTH] OK: Azure CLI instalado
+    )
+)
+
+:: 8. Verificar Ollama (apenas informativo)
+where ollama >nul 2>&1
+if %errorlevel% neq 0 (
+    echo [HEALTH] AVISO: Ollama nao encontrado (necessario para voz)
+) else (
+    echo [HEALTH] OK: Ollama
+)
+
 goto :eof
