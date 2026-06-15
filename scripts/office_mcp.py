@@ -408,24 +408,49 @@ def edit_document(file_path: str, elements: list, position: str = "end") -> str:
         el_type = el.get("type", "paragraph")
         text = el.get("text", "")
 
-        if el_type == "title":
-            new_paragraphs.append(doc.add_heading(text, level=0))
-        elif el_type == "heading1":
-            new_paragraphs.append(doc.add_heading(text, level=1))
-        elif el_type == "heading2":
-            new_paragraphs.append(doc.add_heading(text, level=2))
-        elif el_type == "list_item":
-            p = doc.add_paragraph(style='List Bullet')
-            run = p.add_run(text)
-            run.bold = el.get("bold", False)
-            run.italic = el.get("italic", False)
+        if position == "begin":
+            # Para adicionar no inicio, usamos o paragrafo referencial (primeiro do documento)
+            ref_paragraph = doc.paragraphs[0] if doc.paragraphs else None
+            if el_type == "title":
+                p = doc.add_heading(text, level=0)
+            elif el_type == "heading1":
+                p = doc.add_heading(text, level=1)
+            elif el_type == "heading2":
+                p = doc.add_heading(text, level=2)
+            elif el_type == "list_item":
+                p = doc.add_paragraph(style='List Bullet')
+                run = p.add_run(text)
+                run.bold = el.get("bold", False)
+                run.italic = el.get("italic", False)
+            else:
+                p = doc.add_paragraph()
+                run = p.add_run(text)
+                run.bold = el.get("bold", False)
+                run.italic = el.get("italic", False)
+            # Mover o elemento para antes do paragrafo referencial
+            if ref_paragraph is not None:
+                p._element.getparent().remove(p._element)
+                ref_paragraph._element.addprevious(p._element)
             new_paragraphs.append(p)
         else:
-            p = doc.add_paragraph()
-            run = p.add_run(text)
-            run.bold = el.get("bold", False)
-            run.italic = el.get("italic", False)
-            new_paragraphs.append(p)
+            if el_type == "title":
+                new_paragraphs.append(doc.add_heading(text, level=0))
+            elif el_type == "heading1":
+                new_paragraphs.append(doc.add_heading(text, level=1))
+            elif el_type == "heading2":
+                new_paragraphs.append(doc.add_heading(text, level=2))
+            elif el_type == "list_item":
+                p = doc.add_paragraph(style='List Bullet')
+                run = p.add_run(text)
+                run.bold = el.get("bold", False)
+                run.italic = el.get("italic", False)
+                new_paragraphs.append(p)
+            else:
+                p = doc.add_paragraph()
+                run = p.add_run(text)
+                run.bold = el.get("bold", False)
+                run.italic = el.get("italic", False)
+                new_paragraphs.append(p)
 
     doc.save(file_path)
     return f"Documento editado com sucesso em: {os.path.abspath(file_path)}"
@@ -567,8 +592,8 @@ def manage_comments(file_path: str, action: str, text: str = None, author: str =
                 comments_part = docx.opc.parts.comments.CommentsPart(doc.part.package, comments_xml)
                 doc.part.relate_to(comments_part, RT.COMMENTS)
 
-            import random
-            cid = str(random.randint(100000, 999999))
+            import uuid
+            cid = str(uuid.uuid4().int)[:8]
             comment = docx.oxml.parse_xml(
                 f'<w:comment xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" '
                 f'w:id="{cid}" w:author="{author}" w:date="{datetime.datetime.now().isoformat()}">'
@@ -1251,8 +1276,17 @@ def create_chart(file_path: str, sheet_name: str, chart_type: str, categories_ra
     chart.title = title or f"Grafico {chart_type}"
     chart.style = 10
 
-    data_ref = Reference(ws, min_col=2, min_row=1, max_row=values_range.split(":")[1].replace(values_range[0], ""))
-    cats_ref = Reference(ws, min_col=1, min_row=2, max_row=categories_range.split(":")[1].replace(categories_range[0], ""))
+    import re
+    # Parsing robusto: extrair numero da linha do range (ex: "B2:B100" -> 100, "AA1:AA10" -> 10)
+    values_match = re.search(r':(\d+)$', values_range)
+    cats_match = re.search(r':(\d+)$', categories_range)
+    if not values_match or not cats_match:
+        return "Erro: Intervalos invalidos. Use formato como 'A1:A10' ou 'B2:B100'."
+    max_row_values = int(values_match.group(1))
+    max_row_cats = int(cats_match.group(1))
+
+    data_ref = Reference(ws, min_col=2, min_row=1, max_row=max_row_values)
+    cats_ref = Reference(ws, min_col=1, min_row=2, max_row=max_row_cats)
 
     try:
         chart.add_data(data_ref, titles_from_data=True)
@@ -1619,7 +1653,6 @@ def create_spreadsheet_from_example(file_path: str, example_path: str, sheets_da
                     cell = ws.cell(row=row_idx, column=col_idx, value=value)
 
                     if sheet_name in wb_example.sheetnames:
-                        ws_example = wb_example[sheet_name]
                         src_cell = ws_example.cell(row=row_idx, column=col_idx)
                         if src_cell.font:
                             cell.font = openpyxl.styles.Font(
