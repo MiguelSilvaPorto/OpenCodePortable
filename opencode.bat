@@ -19,11 +19,25 @@ if defined USERPROFILE (
     if exist "%SCOOP_SHIMS%" set "PATH=%SCOOP_SHIMS%;%PATH%"
 )
 
+:: Configurar diretorio de logs
+set "LOG_DIR=%OPENCODE_DATA%\logs"
+set "LOG_FILE=%LOG_DIR%\launcher.jsonl"
+if not exist "%LOG_DIR%" mkdir "%LOG_DIR%"
+
 :: Disparar o monitor de logs exclusivo em background de forma transparente se o PowerShell estiver disponivel
 where powershell >nul 2>&1
 if %errorlevel% == 0 (
-    start /b powershell -NoProfile -ExecutionPolicy Bypass -File "%OPENCODE_HOME%scripts\opencode-monitor.ps1" -LogDir "%OPENCODE_DATA%\logs" -OpenCodeHome "%OPENCODE_HOME%" >nul 2>&1
+    start /b powershell -NoProfile -ExecutionPolicy Bypass -File "%OPENCODE_HOME%scripts\opencode-monitor.ps1" -LogDir "%LOG_DIR%" -OpenCodeHome "%OPENCODE_HOME%" >nul 2>&1
 )
+
+:: Capturar PID do processo atual para os logs
+for /f "tokens=2" %%p in ('tasklist /fi "IMAGENAME eq cmd.exe" /fo list /nh 2^>nul ^| findstr /i "PID:"') do (
+    set "_PID=%%p"
+)
+if not defined _PID set "_PID=0"
+
+:: Registrar inicio no log JSONL
+call :write_log "SYSTEM" "START" "launcher=bat"
 
 
 if not exist "%OPENCODE_BIN%" mkdir "%OPENCODE_BIN%"
@@ -53,6 +67,7 @@ if not exist "%OPENCODE_BIN%\opencode.exe" (
         exit /b 1
     )
     echo [OK] opencode.exe instalado com sucesso.
+    call :write_log "DOWNLOAD" "COMPLETED" "version=1.17.7"
 )
 
 :: Verificar atualizacao disponivel (roda sempre que o exe existe)
@@ -75,6 +90,7 @@ if exist "%OPENCODE_BIN%\opencode.exe" (
         echo   Instalada:  v!LOCAL_VER!
         echo   Disponivel: v!LATEST_VER!
         echo.
+        call :write_log "UPDATE" "AVAILABLE" "local=!LOCAL_VER!,latest=!LATEST_VER!"
         set /p UPDATE_CHOICE="  Deseja atualizar agora? (S/N): "
         if /i "!UPDATE_CHOICE!"=="S" (
             echo [INFO] Atualizando para v!LATEST_VER!...
@@ -82,18 +98,22 @@ if exist "%OPENCODE_BIN%\opencode.exe" (
             powershell -Command "[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12; Invoke-WebRequest -Uri 'https://github.com/anomalyco/opencode/releases/download/v!LATEST_VER!/opencode-windows-x64.zip' -OutFile '%OPENCODE_BIN%\opencode.zip'"
             if !errorlevel! neq 0 (
                 echo [ERRO] Falha ao baixar a atualizacao.
+                call :write_log "UPDATE" "FAILED" "target=!LATEST_VER!"
             ) else (
                 powershell -Command "Expand-Archive -Path '%OPENCODE_BIN%\opencode.zip' -DestinationPath '%OPENCODE_BIN%' -Force"
                 del "%OPENCODE_BIN%\opencode.zip"
                 echo [OK] Atualizado com sucesso! v!LOCAL_VER! -^> v!LATEST_VER!
+                call :write_log "UPDATE" "SUCCESS" "from=!LOCAL_VER!,to=!LATEST_VER!"
             )
         ) else (
             echo   Continuando com v!LOCAL_VER!...
+            call :write_log "UPDATE" "DECLINED" "local=!LOCAL_VER!,latest=!LATEST_VER!"
         )
         echo.
     ) else (
         if defined LATEST_VER if not "!LATEST_VER!"=="" (
             echo [OK] Versao v!LOCAL_VER! esta atualizada.
+            call :write_log "UPDATE" "UP_TO_DATE" "version=!LOCAL_VER!"
         )
     )
 )
@@ -357,6 +377,7 @@ if !errorlevel! neq 0 (
         echo }
     ) > "%OPENCODE_CONFIG%"
     echo [OK] Caminhos MCP corrigidos para: %OPENCODE_HOME%
+    call :write_log "CONFIG" "PATH_FIX" "home=!EXPECTED_MCP_FWD!"
 )
 
 :: Garantir que multitask-worktrees seja uma juncao limpa apontando para a pasta TEMP para evitar erro de recursao do multitask agent
@@ -364,6 +385,7 @@ if exist "multitask-worktrees" rmdir /s /q "multitask-worktrees"
 if not exist "%TEMP%\opencode-worktrees" mkdir "%TEMP%\opencode-worktrees"
 mklink /j "multitask-worktrees" "%TEMP%\opencode-worktrees" >nul 2>&1
 set "OPENCODE_DISABLE_PROJECT_CONFIG=1"
+call :write_log "LAUNCH" "START" "exe=opencode.exe"
 echo [INFO] Iniciando opencode.exe...
 if "%~1"=="" (
     "%OPENCODE_BIN%\opencode.exe" "%OPENCODE_HOME:~0,-1%"
@@ -371,7 +393,9 @@ if "%~1"=="" (
     "%OPENCODE_BIN%\opencode.exe" %*
 )
 echo.
-echo [INFO] O OpenCode encerrou com o codigo de retorno: %errorlevel%
+set "EXIT_CODE=%errorlevel%"
+call :write_log "SYSTEM" "END" "exit_code=!EXIT_CODE!"
+echo [INFO] O OpenCode encerrou com o codigo de retorno: !EXIT_CODE!
 pause
 goto :eof
 
@@ -394,3 +418,19 @@ if /i "!AZ_LOGIN_NOW!"=="S" (
 )
 goto :eof
 
+:: ============================================
+:: Sub-rotina: Escrever log JSONL
+:: Uso: call :write_log "STAGE" "EVENT" "key=value"
+:: ============================================
+:write_log
+if not defined LOG_FILE goto :eof
+set "_STAGE=%~1"
+set "_EVENT=%~2"
+set "_CTX=%~3"
+for /f "tokens=*" %%t in ('powershell -NoProfile -Command "(Get-Date).ToString('o')"') do set "_TS=%%t"
+set "_LEVEL=INFO"
+echo !_EVENT! | findstr /i "FAILED ERROR ABORTED FATAL" >nul 2>&1 && set "_LEVEL=ERROR"
+echo !_EVENT! | findstr /i "SUCCESS COMPLETED OK DONE" >nul 2>&1 && set "_LEVEL=SUCCESS"
+echo !_EVENT! | findstr /i "WARN FALLBACK RETRY SKIP" >nul 2>&1 && set "_LEVEL=WARN"
+>> "%LOG_FILE%" echo {"ts":"!_TS!","level":"!_LEVEL!","stage":"!_STAGE!","event":"!_EVENT!","context":{"!_CTX!"},"pid":%_PID%}
+goto :eof
