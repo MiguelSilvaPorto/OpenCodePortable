@@ -4,8 +4,12 @@
     [
       "@renjfk/opencode-voice",
       {
-        "endpoint": "http://localhost:11434/v1",
-        "model": "llama3.2"
+        "endpoint": "https://api.groq.com/openai/v1",
+        "model": "llama-3.1-8b-instant",
+        "apiKeyEnv": "GROQ_API_KEY",
+        "apiKey": "***REMOVED***",
+        "retries": 2,
+        "sttPrompt": "Você é um robô de limpeza de transcrição de voz. Sua tarefa é APENAS remover gagueiras, palavras repetidas e hesitações (como 'hã', 'é', 'tipo', 'sabe'). Você NUNCA deve resumir, NUNCA deve encurtar e NUNCA deve alterar a frase do usuário. Mantenha todas as informações originais. Responda APENAS com o texto limpo, sem aspas, sem explicações e mantendo a frase inteira sem encurtar."
       }
     ]
   ]
