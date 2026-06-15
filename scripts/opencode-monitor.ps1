@@ -31,8 +31,10 @@ catch {
 
 # Configurações do arquivo de crash
 $reportPath = Join-Path $LogDir "crash-report.md"
+$statusReportPath = Join-Path $LogDir "status-report.md"
 $launcherLog = Join-Path $LogDir "launcher.jsonl"
 $lastCheckTime = Get-Date
+$lastStatusReport = Get-Date
 
 function Write-CrashReport($title, $reason, $details, $file = "Desconhecido", $line = "Desconhecido") {
     $date = Get-Date -Format "yyyy-MM-dd HH:mm:ss"
@@ -62,6 +64,97 @@ $details
     
     # Adicionar o log de forma legível
     Set-Content -Path $reportPath -Value $md -Encoding utf8
+}
+
+function Write-StatusReport {
+    $date = Get-Date -Format "yyyy-MM-dd HH:mm:ss"
+    
+    # Coletar informações do sistema
+    $os = Get-CimInstance Win32_OperatingSystem
+    $cpu = Get-CimInstance Win32_Processor | Select-Object -First 1
+    $ramTotal = [math]::Round($os.TotalVisibleMemorySize / 1MB, 2)
+    $ramFree = [math]::Round($os.FreePhysicalMemory / 1MB, 2)
+    $ramUsed = [math]::Round($ramTotal - $ramFree, 2)
+    
+    # Verificar processos do OpenCode
+    $opencodeProcesses = Get-Process -Name "opencode" -ErrorAction SilentlyContinue
+    $processCount = if ($opencodeProcesses) { $opencodeProcesses.Count } else { 0 }
+    
+    # Verificar status dos plugins
+    $configPath = Join-Path (Split-Path $LogDir -Parent) "config\opencode.jsonc"
+    $pluginStatus = "Não encontrado"
+    if (Test-Path $configPath) {
+        $config = Get-Content $configPath -Raw | ConvertFrom-Json -ErrorAction SilentlyContinue
+        if ($config.plugin) {
+            $pluginCount = $config.plugin.Count
+            $pluginStatus = "$pluginCount plugins configurados"
+        }
+    }
+    
+    # Verificar erros recentes
+    $recentErrors = 0
+    if (Test-Path $launcherLog) {
+        $oneHourAgo = (Get-Date).AddHours(-1)
+        $recentErrors = (Get-Content $launcherLog -ErrorAction SilentlyContinue | 
+            Select-String -Pattern '"level":"ERROR"' | 
+            Measure-Object).Count
+    }
+    
+    # Criar relatório de status em Markdown
+    $md = @"
+# Relatório de Status do OpenCode Portable
+
+**Data e Hora:** $date
+
+## Informações do Sistema
+| Componente | Status |
+|------------|--------|
+| Sistema Operacional | $($os.Caption) $($os.Version) |
+| CPU | $($cpu.Name) |
+| RAM Total | $ramTotal GB |
+| RAM Usada | $ramUsed GB |
+| RAM Livre | $ramFree GB |
+
+## Status do OpenCode
+| Métrica | Valor |
+|---------|-------|
+| Processos Ativos | $processCount |
+| Plugins | $pluginStatus |
+| Erros (última hora) | $recentErrors |
+
+## Últimos Erros
+"@
+    
+    # Adicionar últimos erros se existirem
+    if (Test-Path $launcherLog) {
+        $lastErrors = Get-Content $launcherLog -ErrorAction SilentlyContinue | 
+            Select-String -Pattern '"level":"ERROR"' | 
+            Select-Object -Last 5
+        
+        if ($lastErrors) {
+            foreach ($error in $lastErrors) {
+                $logEntry = ConvertFrom-Json $error.Line -ErrorAction SilentlyContinue
+                if ($logEntry) {
+                    $md += "`n- **$($logEntry.ts)**: $($logEntry.context.error)"
+                }
+            }
+        } else {
+            $md += "`nNenhum erro registrado na última hora."
+        }
+    }
+    
+    $md += @"
+
+---
+*Este relatório foi gerado automaticamente pelo Monitor de Logs do OpenCode.*
+*Atualizado a cada 5 minutos.*
+"@
+    
+    # Garante que a pasta de logs existe
+    if (-not (Test-Path $LogDir)) { New-Item -ItemType Directory -Path $LogDir -Force | Out-Null }
+    
+    # Salvar relatório de status
+    Set-Content -Path $statusReportPath -Value $md -Encoding utf8
 }
 
 # Inicializar o loop de monitoramento com escuta dinâmica de processos e arquivos
@@ -131,9 +224,9 @@ try {
                                 $event = $logEntry.event
                                 $context = $logEntry.context
                                 
-                                # Filtrar caminhos contendo Projects/ ou multitask-worktrees para evitar falsos positivos
+                                # Filtrar caminhos contendo multitask-worktrees para evitar falsos positivos de criacao de worktree
                                 $pathString = $context | ConvertTo-Json -Compress
-                                if ($pathString -match "Projects" -or $pathString -match "worktrees" -or $pathString -match "multitask-worktrees") {
+                                if ($pathString -match "multitask-worktrees" -and $event -match "CREATE|MKLINK|MKDIR") {
                                     continue
                                 }
                                 
@@ -171,6 +264,13 @@ try {
         }
         
         Start-Sleep -Seconds 2
+        
+        # Gerar relatório de status a cada 5 minutos
+        $now = Get-Date
+        if (($now - $lastStatusReport).TotalMinutes -ge 5) {
+            Write-StatusReport
+            $lastStatusReport = $now
+        }
     }
 }
 finally {

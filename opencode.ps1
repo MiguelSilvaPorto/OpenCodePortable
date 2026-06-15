@@ -261,6 +261,157 @@ function Download-OpenCodeExe {
 }
 
 # ============================================================================
+# SINCRONIZACAO DO PLUGIN NPM COM VERSAO DO BINARIO
+# ============================================================================
+
+function Sync-NpmPlugins {
+    param([string]$BinaryVersion)
+
+    $packageJsonPath = Join-Path $OPENCODE_CONFIG "package.json"
+    $packageLockPath = Join-Path $OPENCODE_CONFIG "package-lock.json"
+    $nodeModulesPath = Join-Path $OPENCODE_CONFIG "node_modules"
+    $pluginMarkerPath = Join-Path $OPENCODE_DATA ".plugin-version"
+
+    # 1. Verificar disponibilidade do npm
+    $npmCmd = Get-Command npm -ErrorAction SilentlyContinue
+    if (-not $npmCmd) {
+        Write-Log "NPM_SYNC" "SKIP" @{ reason = "NPM_NOT_FOUND" } "WARN"
+        return $true
+    }
+
+    # 2. Determinar versao instalada do plugin
+    $installedPluginVersion = ""
+    if (Test-Path $pluginMarkerPath) {
+        try {
+            $installedPluginVersion = (Get-Content $pluginMarkerPath -Raw).Trim()
+        } catch { }
+    }
+    # Fallback: tentar ler do package-lock.json
+    if (-not $installedPluginVersion -and (Test-Path $packageLockPath)) {
+        try {
+            $lockRaw = Get-Content $packageLockPath -Raw -Encoding UTF8
+            if ($lockRaw -match '"@opencode-ai/plugin":\s*\{[^}]*"version":\s*"([^"]+)"') {
+                $installedPluginVersion = $Matches[1]
+            }
+        } catch { }
+    }
+
+    # 3. Comparar versoes
+    if ($installedPluginVersion -eq $BinaryVersion) {
+        Write-Log "NPM_SYNC" "UP_TO_DATE" @{ plugin = $installedPluginVersion; binary = $BinaryVersion }
+        return $true
+    }
+
+    Write-Log "NPM_SYNC" "MISMATCH" @{ installed = $installedPluginVersion; target = $BinaryVersion }
+
+    # 4. Garantir que o diretorio config existe
+    if (-not (Test-Path $OPENCODE_CONFIG)) {
+        New-Item -ItemType Directory -Path $OPENCODE_CONFIG -Force | Out-Null
+    }
+
+    # 5. Escrever package.json com versao correta
+    $packageJson = @"
+{
+  "dependencies": {
+    "@opencode-ai/plugin": "$BinaryVersion"
+  }
+}
+"@
+    try {
+        [System.IO.File]::WriteAllText($packageJsonPath, $packageJson, [System.Text.Encoding]::UTF8)
+        Write-Log "NPM_SYNC" "PACKAGE_JSON_WRITTEN" @{ version = $BinaryVersion }
+    }
+    catch {
+        Write-Log "NPM_SYNC" "PACKAGE_JSON_FAILED" @{ error = $_.Exception.Message } "ERROR"
+        return $false
+    }
+
+    # 6. Executar npm install (com retry)
+    for ($attempt = 1; $attempt -le $MAX_RETRIES; $attempt++) {
+        try {
+            Write-Log "NPM_SYNC" "INSTALL_START" @{ attempt = $attempt; max = $MAX_RETRIES }
+            $npmProcess = Start-Process -FilePath "npm" -ArgumentList "install" -WorkingDirectory $OPENCODE_CONFIG -NoNewWindow -Wait -PassThru -RedirectStandardOutput "$env:TEMP\npm-stdout.txt" -RedirectStandardError "$env:TEMP\npm-stderr.txt"
+            $npmExit = $npmProcess.ExitCode
+
+            if ($npmExit -eq 0) {
+                # Atualizar marker
+                [System.IO.File]::WriteAllText($pluginMarkerPath, $BinaryVersion, [System.Text.Encoding]::UTF8)
+                Write-Log "NPM_SYNC" "SUCCESS" @{ version = $BinaryVersion; attempt = $attempt }
+                return $true
+            }
+            else {
+                $stderr = ""
+                if (Test-Path "$env:TEMP\npm-stderr.txt") {
+                    $stderr = Get-Content "$env:TEMP\npm-stderr.txt" -Raw -ErrorAction SilentlyContinue
+                }
+                Write-Log "NPM_SYNC" "INSTALL_FAILED" @{ attempt = $attempt; exit_code = $npmExit; stderr = $stderr } "WARN"
+            }
+        }
+        catch {
+            Write-Log "NPM_SYNC" "EXCEPTION" @{ attempt = $attempt; error = $_.Exception.Message } "WARN"
+        }
+
+        if ($attempt -lt $MAX_RETRIES) {
+            Start-Sleep -Seconds (3 * $attempt)
+        }
+    }
+
+    Write-Log "NPM_SYNC" "ABORTED" @{ reason = "MAX_RETRIES_EXCEEDED"; target_version = $BinaryVersion } "ERROR"
+    return $false
+}
+
+# ============================================================================
+# FUNCAO AUXILIAR: Gerar config padrao
+# ============================================================================
+
+function New-DefaultConfig {
+    param(
+        [string]$OfficeMcpPath,
+        [string]$ProjectMcpPath
+    )
+    
+    $endpoint = "http://localhost:11434/v1"
+    $model = "llama3.2"
+    $useGroq = $false
+    
+    if ($env:GROQ_API_KEY) {
+        $endpoint = "https://api.groq.com/openai/v1"
+        $model = "llama-3.3-70b-versatile"
+        $useGroq = $true
+    }
+    
+    $voiceConfig = [ordered]@{
+        "endpoint" = $endpoint
+        "model" = $model
+    }
+    if ($useGroq) {
+        $voiceConfig.Add("apiKeyEnv", "GROQ_API_KEY")
+    }
+    
+    return [ordered]@{
+        "`$schema" = "https://opencode.ai/config.json"
+        "plugin" = @(
+            @(
+                "@renjfk/opencode-voice",
+                $voiceConfig
+            )
+        )
+        "mcp" = [ordered]@{
+            "office-mcp" = [ordered]@{
+                "type" = "local"
+                "command" = @("python", $OfficeMcpPath)
+                "enabled" = $true
+            }
+            "project-mcp" = [ordered]@{
+                "type" = "local"
+                "command" = @("python", $ProjectMcpPath)
+                "enabled" = $true
+            }
+        }
+    }
+}
+
+# ============================================================================
 # SETUP INICIAL (Idempotente)
 # ============================================================================
 
@@ -361,60 +512,26 @@ function Run-InitialSetup {
     $projectMcpScriptPath = Join-Path $OPENCODE_HOME "scripts\project_generator.py"
     $projectMcpScriptPathJson = $projectMcpScriptPath -replace '\\', '/'
 
-    $endpoint = "http://localhost:11434/v1"
-    $model = "llama3.2"
-    $apiKey = $null
-
-    if ($env:GROQ_API_KEY) {
-        $endpoint = "https://api.groq.com/openai/v1"
-        $model = "llama3-8b-8192"
-        $apiKey = $env:GROQ_API_KEY
-        Write-Log "SETUP" "GROQ_DETECTED" @{ model = $model }
-    } else {
-        Write-Log "SETUP" "OLLAMA_FALLBACK" @{ model = $model }
-    }
-
-    $voiceConfig = [ordered]@{
-        "endpoint" = $endpoint
-        "model" = $model
-    }
-    if ($apiKey) {
-        $voiceConfig.Add("apiKey", $apiKey)
-    }
-
     Write-Log "SETUP" "CONFIG_WRITE" @{ file = $configFile; office_mcp_path = $mcpScriptPathJson; project_mcp_path = $projectMcpScriptPathJson }
     
-    $configObj = [ordered]@{
-        "`$schema" = "https://opencode.ai/config.json"
-        "plugin" = @(
-            @(
-                "@renjfk/opencode-voice",
-                $voiceConfig
-            ),
-            "multitask",
-            "multitask-tui.tsx",
-            "workspace-tui.tsx",
-            "auto-switch-mode.ts"
-        )
-        "mcp" = [ordered]@{
-            "office-mcp" = [ordered]@{
-                "type" = "local"
-                "command" = @("python", $mcpScriptPathJson)
-                "enabled" = $true
-            }
-            "project-mcp" = [ordered]@{
-                "type" = "local"
-                "command" = @("python", $projectMcpScriptPathJson)
-                "enabled" = $true
-            }
-        }
-    }
-    
+    $configObj = New-DefaultConfig -OfficeMcpPath $mcpScriptPathJson -ProjectMcpPath $projectMcpScriptPathJson
     $configObj | ConvertTo-Json -Depth 10 | Set-Content -Path $configFile -Encoding UTF8
 
-    # Criar marker
-    New-Item -ItemType File -Path $FIRST_RUN_MARKER -Force | Out-Null
-    Write-Log "SETUP" "COMPLETED" @{ marker = $FIRST_RUN_MARKER }
+    # Criar marker APENAS se setup foi bem-sucedido (verificar Python e deps)
+    $pythonOk = $null -ne (Get-Command python -ErrorAction SilentlyContinue)
+    $depsOk = $false
+    if ($pythonOk) {
+        python -c "import openpyxl, docx, pptx, mcp" 2>$null
+        $depsOk = $LASTEXITCODE -eq 0
+    }
+    
+    if ($pythonOk -and $depsOk) {
+        New-Item -ItemType File -Path $FIRST_RUN_MARKER -Force | Out-Null
+        Write-Log "SETUP" "COMPLETED" @{ marker = $FIRST_RUN_MARKER }
+    } else {
+        Write-Log "SETUP" "PARTIAL" @{ reason = "CRITICAL_DEPS_MISSING"; python = $pythonOk; deps = $depsOk } "WARN"
+        Write-Host "[WARN] Algumas dependencias nao foram instaladas. O setup tentara novamente na proxima execucao." -ForegroundColor Yellow
+    }
 
     Write-Host ""
     Write-Host "============================================" -ForegroundColor Green
@@ -437,30 +554,7 @@ function Update-OpenCodeConfig {
 
     if (-not (Test-Path $configFile)) {
         Write-Log "CONFIG" "MISSING" @{ action = "WILL_CREATE" } "WARN"
-        # Criar config padrao completo
-        $endpoint = "http://localhost:11434/v1"
-        $model = "llama3.2"
-        if ($env:GROQ_API_KEY) {
-            $endpoint = "https://api.groq.com/openai/v1"
-            $model = "llama3-8b-8192"
-        }
-        $voiceCfg = [ordered]@{ endpoint = $endpoint; model = $model }
-        if ($env:GROQ_API_KEY) { $voiceCfg.Add("apiKey", $env:GROQ_API_KEY) }
-
-        $configObj = [ordered]@{
-            "`$schema" = "https://opencode.ai/config.json"
-            plugin = @(
-                @("@renjfk/opencode-voice", $voiceCfg),
-                "multitask",
-                "multitask-tui.tsx",
-                "workspace-tui.tsx",
-                "auto-switch-mode.ts"
-            )
-            mcp = [ordered]@{
-                "office-mcp" = [ordered]@{ type = "local"; command = @("python", $mcpScriptPath); enabled = $true }
-                "project-mcp" = [ordered]@{ type = "local"; command = @("python", $projectMcpPath); enabled = $true }
-            }
-        }
+        $configObj = New-DefaultConfig -OfficeMcpPath $mcpScriptPath -ProjectMcpPath $projectMcpPath
         $configObj | ConvertTo-Json -Depth 10 | Set-Content -Path $configFile -Encoding UTF8
         Write-Log "CONFIG" "CREATED" @{ office_mcp = $mcpScriptPath; project_mcp = $projectMcpPath }
         return
@@ -516,30 +610,7 @@ function Update-OpenCodeConfig {
     }
     catch {
         Write-Log "CONFIG" "PARSE_ERROR" @{ error = $_.Exception.Message } "ERROR"
-        # Recriar config do zero se parse falhar
-        $endpoint = "http://localhost:11434/v1"
-        $model = "llama3.2"
-        if ($env:GROQ_API_KEY) {
-            $endpoint = "https://api.groq.com/openai/v1"
-            $model = "llama3-8b-8192"
-        }
-        $voiceCfg = [ordered]@{ endpoint = $endpoint; model = $model }
-        if ($env:GROQ_API_KEY) { $voiceCfg.Add("apiKey", $env:GROQ_API_KEY) }
-
-        $configObj = [ordered]@{
-            "`$schema" = "https://opencode.ai/config.json"
-            plugin = @(
-                @("@renjfk/opencode-voice", $voiceCfg),
-                "multitask",
-                "multitask-tui.tsx",
-                "workspace-tui.tsx",
-                "auto-switch-mode.ts"
-            )
-            mcp = [ordered]@{
-                "office-mcp" = [ordered]@{ type = "local"; command = @("python", $mcpScriptPath); enabled = $true }
-                "project-mcp" = [ordered]@{ type = "local"; command = @("python", $projectMcpPath); enabled = $true }
-            }
-        }
+        $configObj = New-DefaultConfig -OfficeMcpPath $mcpScriptPath -ProjectMcpPath $projectMcpPath
         $configObj | ConvertTo-Json -Depth 10 | Set-Content -Path $configFile -Encoding UTF8
         Write-Log "CONFIG" "RECREATED" @{ reason = "PARSE_FAILURE"; office_mcp = $mcpScriptPath; project_mcp = $projectMcpPath } "WARN"
     }
@@ -871,6 +942,15 @@ if ($exeStatus.valid) {
     }
     else {
         Write-Log "UPDATE" "UP_TO_DATE" @{ version = $localVersion }
+    }
+}
+
+# 1.6. Sincronizar plugins npm com versao do binario
+$exeForSync = Join-Path $OPENCODE_BIN "opencode.exe"
+if (Test-Path $exeForSync) {
+    $syncStatus = Test-OpenCodeExe $exeForSync
+    if ($syncStatus.valid) {
+        Sync-NpmPlugins -BinaryVersion $syncStatus.version
     }
 }
 

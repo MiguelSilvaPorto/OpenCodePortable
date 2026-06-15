@@ -4,21 +4,18 @@
         [
             "@renjfk/opencode-voice",
             {
-                "endpoint": "http://localhost:11434/v1",
-                "model": "llama3.2"
+                "endpoint": "https://api.groq.com/openai/v1",
+                "model": "llama-3.3-70b-versatile",
+                "apiKeyEnv": "GROQ_API_KEY"
             }
-        ],
-        "multitask",
-        "multitask-tui.tsx",
-        "workspace-tui.tsx",
-        "auto-switch-mode.ts"
+        ]
     ],
     "mcp": {
         "office-mcp": {
             "type": "local",
             "command": [
                 "python",
-                "D:/Github/OpencodePortable/scripts/office_mcp.py"
+                "D:/Github/Scrath/scripts/office_mcp.py"
             ],
             "enabled": true
         },
@@ -26,7 +23,7 @@
             "type": "local",
             "command": [
                 "python",
-                "D:/Github/OpencodePortable/scripts/project_generator.py"
+                "D:/Github/Scrath/scripts/project_generator.py"
             ],
             "enabled": true
         }

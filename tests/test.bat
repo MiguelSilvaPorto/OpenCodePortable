@@ -2,14 +2,14 @@
 setlocal enabledelayedexpansion
 
 :: Opencode Portable - Script de Teste
-:: Este script verifica se o pacote port??til est?? funcionando corretamente
+:: Este script verifica se o pacote portatil esta funcionando corretamente
 
 echo ========================================
 echo   Teste Opencode Portable
 echo ========================================
 echo.
 
-:: Configurar diret??rio de trabalho (subir um n??vel pois estamos em tests/)
+:: Configurar diretorio de trabalho (subir um nivel pois estamos em tests/)
 set "OPENCODE_HOME=%~dp0.."
 set "OPENCODE_BIN=%OPENCODE_HOME%\bin"
 set "OPENCODE_CONFIG=%OPENCODE_HOME%\config"
@@ -17,7 +17,7 @@ set "OPENCODE_DATA=%OPENCODE_HOME%\data"
 
 set "ERRORS=0"
 
-:: Teste 1: Verificar execut??vel
+:: Teste 1: Verificar executavel
 echo [1/5] Verificando executavel...
 if exist "%OPENCODE_BIN%\opencode.exe" (
     echo   OK: opencode.exe encontrado
@@ -26,7 +26,7 @@ if exist "%OPENCODE_BIN%\opencode.exe" (
     set /a ERRORS+=1
 )
 
-:: Teste 2: Verificar configura????o
+:: Teste 2: Verificar configuracao
 echo [2/5] Verificando configuracao...
 if exist "%OPENCODE_CONFIG%\opencode.jsonc" (
     echo   OK: opencode.jsonc encontrado
@@ -51,7 +51,7 @@ if exist "%OPENCODE_HOME%\opencode.ps1" (
     set /a ERRORS+=1
 )
 
-:: Teste 4: Verificar diret??rios
+:: Teste 4: Verificar diretorios
 echo [4/5] Verificando diretorios...
 if exist "%OPENCODE_DATA%" (
     echo   OK: diretorio data encontrado
@@ -73,7 +73,7 @@ if exist "%OPENCODE_HOME%\scripts" (
     set /a ERRORS+=1
 )
 
-:: Teste 5: Verificar permiss??es
+:: Teste 5: Verificar permissoes
 echo [5/5] Verificando permissoes...
 echo   OK: verificacao de permissoes concluida
 

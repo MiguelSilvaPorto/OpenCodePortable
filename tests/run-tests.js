@@ -13,7 +13,10 @@ console.log('===========================================================');
 const testDataDir = path.join(portableDir, 'data');
 const testConfigDir = path.join(portableDir, 'config');
 
-// Cleanup previous runs
+// Cleanup previous runs - USAR DIRETORIOS TEMPORARIOS PARA NAO DESTRUIR DADOS REAIS
+const tempTestDataDir = path.join(portableDir, 'test-temp-data');
+const tempTestConfigDir = path.join(portableDir, 'test-temp-config');
+
 function cleanDir(dir) {
   if (fs.existsSync(dir)) {
     try {
@@ -23,8 +26,10 @@ function cleanDir(dir) {
     }
   }
 }
-cleanDir(testDataDir);
-cleanDir(testConfigDir);
+
+// Nao deletar dados reais - usar diretorios temporarios
+cleanDir(tempTestDataDir);
+cleanDir(tempTestConfigDir);
 
 const env = {
   ...process.env,

@@ -21,7 +21,7 @@ if %errorlevel% neq 0 (
 )
 
 echo.
-echo [1/2] Atualizando pip...
+echo [1/3] Atualizando pip...
 python -m pip install --upgrade pip
 
 echo.
