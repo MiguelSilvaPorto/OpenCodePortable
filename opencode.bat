@@ -36,8 +36,9 @@ if exist "%OPENCODE_BIN%\opencode.exe" (
     )
 )
 if not exist "%OPENCODE_BIN%\opencode.exe" (
-    echo [INFO] opencode.exe nao encontrado. Baixando o pacote oficial da versao 1.16.2...
-    powershell -Command "[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12; Invoke-WebRequest -Uri 'https://github.com/anomalyco/opencode/releases/download/v1.16.2/opencode-windows-x64.zip' -OutFile '%OPENCODE_BIN%\opencode.zip'"
+    echo [INFO] opencode.exe nao encontrado. Baixando o pacote oficial da versao 1.17.7...
+    powershell -Command "[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12; Invoke-WebRequest -Uri 'https://github.com/anomalyco/opencode/releases/download/v1.17.7/opencode-windows-x64.zip' -OutFile '%OPENCODE_BIN%\opencode.zip'"
+
     if !errorlevel! neq 0 (
         echo [ERRO] Falha ao baixar o arquivo zip do opencode.
         pause

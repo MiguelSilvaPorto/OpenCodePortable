@@ -35,8 +35,9 @@ $MIN_EXE_SIZE      = 10MB
 $MIN_ZIP_SIZE      = 5MB
 $CACHE_TTL_HOURS   = 24
 $MAX_RETRIES       = 3
-$FALLBACK_VERSION  = "1.17.1"
+$FALLBACK_VERSION  = "1.17.7"
 $GITHUB_REPO       = "anomalyco/opencode"
+
 $LOG_MAX_SIZE      = 10MB
 $LOG_MAX_FILES     = 5
 $TIMEOUT_DOWNLOAD  = 120
