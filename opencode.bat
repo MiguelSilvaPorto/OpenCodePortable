@@ -558,15 +558,28 @@ if %errorlevel% neq 0 (
     echo [HEALTH] OK: Ollama
 )
 
-:: 9. Criar tui.json com configuracao do voice plugin (global)
-:: Criar diretorio global se nao existir
+:: 9. Criar tui.json global do voice plugin
 if not exist "%USERPROFILE%\.config\opencode" mkdir "%USERPROFILE%\.config\opencode"
-
-:: Criar tui.json global (OpenCode le daqui para plugins TUI)
 if not exist "%USERPROFILE%\.config\opencode\tui.json" (
-    echo [HEALTH] Criando configuracao do voice plugin (global)...
+    echo [HEALTH] Criando tui.json global...
     call :create_tui_json
-    echo [HEALTH] OK: tui.json global criado
 )
 
+goto :eof
+
+:create_tui_json
+set "TUI_FILE=%USERPROFILE%\.config\opencode\tui.json"
+>"%TUI_FILE%" echo {
+>>"%TUI_FILE%" echo   "$schema": "https://opencode.ai/tui.json",
+>>"%TUI_FILE%" echo   "plugin": [
+>>"%TUI_FILE%" echo     ["@renjfk/opencode-voice", {
+>>"%TUI_FILE%" echo       "endpoint": "https://api.groq.com/openai/v1",
+>>"%TUI_FILE%" echo       "model": "llama-3.1-8b-instant",
+>>"%TUI_FILE%" echo       "apiKeyEnv": "GROQ_API_KEY",
+>>"%TUI_FILE%" echo       "apiKey": "***REMOVED***",
+>>"%TUI_FILE%" echo       "retries": 2,
+>>"%TUI_FILE%" echo       "sttPrompt": "Voce e um robo de limpeza de transcricao de voz. Sua tarefa e APENAS remover gagueiras, palavras repetidas e hesitacoes. Voce NUNCA deve resumir, NUNCA deve encurtar e NUNCA deve alterar a frase do usuario. Mantenha todas as informacoes originais. Responda APENAS com o texto limpo, sem aspas, sem explicacoes e mantendo a frase inteira sem encurtar."
+>>"%TUI_FILE%" echo     }]
+>>"%TUI_FILE%" echo   ]
+>>"%TUI_FILE%" echo }
 goto :eof
