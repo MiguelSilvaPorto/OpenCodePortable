@@ -559,20 +559,17 @@ if not exist ".opencode\tui.json" (
         echo   "$schema": "https://opencode.ai/tui.json",
         echo   "plugin": [
         echo     ["@renjfk/opencode-voice", {
-        echo       "endpoint": "http://localhost:11434/v1",
-        echo       "model": "llama3.2"
+        echo       "endpoint": "https://api.groq.com/openai/v1",
+        echo       "model": "llama-3.1-8b-instant",
+        echo       "apiKeyEnv": "GROQ_API_KEY",
+        echo       "apiKey": "***REMOVED***",
+        echo       "retries": 2,
+        echo       "sttPrompt": "Voce e um robo de limpeza de transcricao de voz. Sua tarefa e APENAS remover gagueiras, palavras repetidas e hesitacoes. Voce NUNCA deve resumir, NUNCA deve encurtar e NUNCA deve alterar a frase do usuario. Mantenha todas as informacoes originais. Responda APENAS com o texto limpo, sem aspas, sem explicacoes e mantendo a frase inteira sem encurtar."
         echo     }]
         echo   ]
         echo }
     ) > ".opencode\tui.json"
     echo [HEALTH] OK: tui.json criado
-)
-
-:: 10. Limpar cache do plugin voice (forcar atualizacao)
-if exist "%USERPROFILE%\.cache\opencode\packages\@renjfk" (
-    echo [HEALTH] Cache do plugin voice encontrado. Limpando...
-    rmdir /s /q "%USERPROFILE%\.cache\opencode\packages\@renjfk" 2>nul
-    echo [HEALTH] OK: Cache limpo
 )
 
 goto :eof
