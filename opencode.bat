@@ -551,4 +551,28 @@ if %errorlevel% neq 0 (
     echo [HEALTH] OK: Ollama
 )
 
+:: 9. Criar tui.json com configuracao do voice plugin (se nao existir)
+if not exist ".opencode\tui.json" (
+    echo [HEALTH] Criando configuracao do voice plugin...
+    (
+        echo {
+        echo   "$schema": "https://opencode.ai/tui.json",
+        echo   "plugin": [
+        echo     ["@renjfk/opencode-voice", {
+        echo       "endpoint": "http://localhost:11434/v1",
+        echo       "model": "llama3.2"
+        echo     }]
+        echo   ]
+        echo }
+    ) > ".opencode\tui.json"
+    echo [HEALTH] OK: tui.json criado
+)
+
+:: 10. Limpar cache do plugin voice (forcar atualizacao)
+if exist "%USERPROFILE%\.cache\opencode\packages\@renjfk" (
+    echo [HEALTH] Cache do plugin voice encontrado. Limpando...
+    rmdir /s /q "%USERPROFILE%\.cache\opencode\packages\@renjfk" 2>nul
+    echo [HEALTH] OK: Cache limpo
+)
+
 goto :eof
