@@ -551,28 +551,14 @@ if %errorlevel% neq 0 (
     echo [HEALTH] OK: Ollama
 )
 
-:: 9. Criar tui.json com configuracao do voice plugin (global e local)
+:: 9. Criar tui.json com configuracao do voice plugin (global)
 :: Criar diretorio global se nao existir
 if not exist "%USERPROFILE%\.config\opencode" mkdir "%USERPROFILE%\.config\opencode"
 
 :: Criar tui.json global (OpenCode le daqui para plugins TUI)
 if not exist "%USERPROFILE%\.config\opencode\tui.json" (
     echo [HEALTH] Criando configuracao do voice plugin (global)...
-    (
-        echo {
-        echo   "$schema": "https://opencode.ai/tui.json",
-        echo   "plugin": [
-        echo     ["@renjfk/opencode-voice", {
-        echo       "endpoint": "https://api.groq.com/openai/v1",
-        echo       "model": "llama-3.1-8b-instant",
-        echo       "apiKeyEnv": "GROQ_API_KEY",
-        echo       "apiKey": "***REMOVED***",
-        echo       "retries": 2,
-        echo       "sttPrompt": "Voce e um robo de limpeza de transcricao de voz. Sua tarefa e APENAS remover gagueiras, palavras repetidas e hesitacoes. Voce NUNCA deve resumir, NUNCA deve encurtar e NUNCA deve alterar a frase do usuario. Mantenha todas as informacoes originais. Responda APENAS com o texto limpo, sem aspas, sem explicacoes e mantendo a frase inteira sem encurtar."
-        echo     }]
-        echo   ]
-        echo }
-    ) > "%USERPROFILE%\.config\opencode\tui.json"
+    powershell -NoProfile -Command "$j = @{ '$schema' = 'https://opencode.ai/tui.json'; plugin = @(@( '@renjfk/opencode-voice', @{ endpoint = 'https://api.groq.com/openai/v1'; model = 'llama-3.1-8b-instant'; apiKeyEnv = 'GROQ_API_KEY'; apiKey = '***REMOVED***'; retries = 2; sttPrompt = 'Voce e um robo de limpeza de transcricao de voz. Sua tarefa e APENAS remover gagueiras, palavras repetidas e hesitacoes. Voce NUNCA deve resumir, NUNCA deve encurtar e NUNCA deve alterar a frase do usuario. Mantenha todas as informacoes originais. Responda APENAS com o texto limpo, sem aspas, sem explicacoes e mantendo a frase inteira sem encurtar.' })) } | ConvertTo-Json -Depth 5 | Set-Content '%USERPROFILE%\.config\opencode\tui.json' -Encoding UTF8"
     echo [HEALTH] OK: tui.json global criado
 )
 
