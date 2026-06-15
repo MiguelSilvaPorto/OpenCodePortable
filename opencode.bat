@@ -55,6 +55,49 @@ if not exist "%OPENCODE_BIN%\opencode.exe" (
     echo [OK] opencode.exe instalado com sucesso.
 )
 
+:: Verificar atualizacao disponivel (roda sempre que o exe existe)
+if exist "%OPENCODE_BIN%\opencode.exe" (
+    echo [INFO] Verificando atualizacoes...
+    for /f "tokens=*" %%v in ('"%OPENCODE_BIN%\opencode.exe" --version 2^>^&1') do set "LOCAL_VER=%%v"
+    :: Extrair apenas numeros de versao (ex: 1.17.7)
+    for /f "tokens=1 delims= " %%a in ("!LOCAL_VER!") do set "LOCAL_VER=%%a"
+    :: Remover prefixo v se houver
+    set "LOCAL_VER=!LOCAL_VER:v=!"
+
+    :: Buscar ultima versao via GitHub API
+    for /f "delims=" %%r in ('powershell -NoProfile -Command "try { [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12; $r = Invoke-RestMethod -Uri 'https://api.github.com/repos/anomalyco/opencode/releases/latest' -TimeoutSec 10; $r.tag_name -replace '^v','' } catch { '' }" 2^>nul') do set "LATEST_VER=%%r"
+
+    if defined LATEST_VER if not "!LATEST_VER!"=="" if not "!LATEST_VER!"=="!LOCAL_VER!" (
+        echo.
+        echo ============================================
+        echo   Nova versao disponivel!
+        echo ============================================
+        echo   Instalada:  v!LOCAL_VER!
+        echo   Disponivel: v!LATEST_VER!
+        echo.
+        set /p UPDATE_CHOICE="  Deseja atualizar agora? (S/N): "
+        if /i "!UPDATE_CHOICE!"=="S" (
+            echo [INFO] Atualizando para v!LATEST_VER!...
+            del "%OPENCODE_BIN%\opencode.exe"
+            powershell -Command "[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12; Invoke-WebRequest -Uri 'https://github.com/anomalyco/opencode/releases/download/v!LATEST_VER!/opencode-windows-x64.zip' -OutFile '%OPENCODE_BIN%\opencode.zip'"
+            if !errorlevel! neq 0 (
+                echo [ERRO] Falha ao baixar a atualizacao.
+            ) else (
+                powershell -Command "Expand-Archive -Path '%OPENCODE_BIN%\opencode.zip' -DestinationPath '%OPENCODE_BIN%' -Force"
+                del "%OPENCODE_BIN%\opencode.zip"
+                echo [OK] Atualizado com sucesso! v!LOCAL_VER! -^> v!LATEST_VER!
+            )
+        ) else (
+            echo   Continuando com v!LOCAL_VER!...
+        )
+        echo.
+    ) else (
+        if defined LATEST_VER if not "!LATEST_VER!"=="" (
+            echo [OK] Versao v!LOCAL_VER! esta atualizada.
+        )
+    )
+)
+
 if not exist "%OPENCODE_DATA%" mkdir "%OPENCODE_DATA%"
 if not exist "%OPENCODE_CONFIG_DIR%" mkdir "%OPENCODE_CONFIG_DIR%"
 
@@ -221,10 +264,15 @@ if %errorlevel% neq 0 (
     echo       OK
 )
 
-:: Configurar o plugin de voz em opencode.jsonc se nao estiver configurado
-findstr /i "@renjfk/opencode-voice" "%OPENCODE_CONFIG%" >nul 2>&1
+:: Configurar opencode.jsonc completo se nao existir ou estiver sem MCP
+findstr /i "office-mcp" "%OPENCODE_CONFIG%" >nul 2>&1
 if %errorlevel% neq 0 (
-    echo Configurando plugin de voz em opencode.jsonc...
+    echo Configurando opencode.jsonc com plugins e servidores MCP...
+    set "MCP_OFFICE=%OPENCODE_HOME%scripts\office_mcp.py"
+    set "MCP_PROJECT=%OPENCODE_HOME%scripts\project_generator.py"
+    :: Converter barras para JSON (forward slashes)
+    set "MCP_OFFICE=!MCP_OFFICE:\=/!"
+    set "MCP_PROJECT=!MCP_PROJECT:\=/!"
     (
         echo {
         echo   "$schema": "https://opencode.ai/config.json",
@@ -232,11 +280,27 @@ if %errorlevel% neq 0 (
         echo     ["@renjfk/opencode-voice", {
         echo       "endpoint": "http://localhost:11434/v1",
         echo       "model": "llama3.2"
-        echo     }]
-        echo   ]
+        echo     }],
+        echo     "multitask",
+        echo     "multitask-tui.tsx",
+        echo     "workspace-tui.tsx",
+        echo     "auto-switch-mode.ts"
+        echo   ],
+        echo   "mcp": {
+        echo     "office-mcp": {
+        echo       "type": "local",
+        echo       "command": ["python", "!MCP_OFFICE!"],
+        echo       "enabled": true
+        echo     },
+        echo     "project-mcp": {
+        echo       "type": "local",
+        echo       "command": ["python", "!MCP_PROJECT!"],
+        echo       "enabled": true
+        echo     }
+        echo   }
         echo }
     ) > "%OPENCODE_CONFIG%"
-    echo Configuracao atualizada!
+    echo Configuracao completa atualizada!
 )
 
 if "!SETUP_OK!"=="1" (
@@ -253,6 +317,48 @@ echo.
 if "%~1"=="" pause
 
 :start
+:: ============================================
+:: Correcao dinamica de caminhos MCP (roda SEMPRE, mesmo pulando setup)
+:: Garante portabilidade: se mover a pasta, os caminhos se corrigem sozinhos
+:: ============================================
+set "EXPECTED_MCP=%OPENCODE_HOME%scripts\office_mcp.py"
+set "EXPECTED_MCP_FWD=!EXPECTED_MCP:\=/!"
+findstr /c:"!EXPECTED_MCP_FWD!" "%OPENCODE_CONFIG%" >nul 2>&1
+if !errorlevel! neq 0 (
+    echo [INFO] Caminhos MCP desatualizados. Corrigindo para diretorio atual...
+    set "MCP_OFFICE=!EXPECTED_MCP_FWD!"
+    set "MCP_PROJECT=%OPENCODE_HOME%scripts\project_generator.py"
+    set "MCP_PROJECT=!MCP_PROJECT:\=/!"
+    (
+        echo {
+        echo   "$schema": "https://opencode.ai/config.json",
+        echo   "plugin": [
+        echo     ["@renjfk/opencode-voice", {
+        echo       "endpoint": "http://localhost:11434/v1",
+        echo       "model": "llama3.2"
+        echo     }],
+        echo     "multitask",
+        echo     "multitask-tui.tsx",
+        echo     "workspace-tui.tsx",
+        echo     "auto-switch-mode.ts"
+        echo   ],
+        echo   "mcp": {
+        echo     "office-mcp": {
+        echo       "type": "local",
+        echo       "command": ["python", "!MCP_OFFICE!"],
+        echo       "enabled": true
+        echo     },
+        echo     "project-mcp": {
+        echo       "type": "local",
+        echo       "command": ["python", "!MCP_PROJECT!"],
+        echo       "enabled": true
+        echo     }
+        echo   }
+        echo }
+    ) > "%OPENCODE_CONFIG%"
+    echo [OK] Caminhos MCP corrigidos para: %OPENCODE_HOME%
+)
+
 :: Garantir que multitask-worktrees seja uma juncao limpa apontando para a pasta TEMP para evitar erro de recursao do multitask agent
 if exist "multitask-worktrees" rmdir /s /q "multitask-worktrees"
 if not exist "%TEMP%\opencode-worktrees" mkdir "%TEMP%\opencode-worktrees"

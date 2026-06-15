@@ -314,12 +314,12 @@ function Run-InitialSetup {
         @{
             name = "PYTHON_DEPS"
             check = {
-                python -c "import openpyxl, docx, pptx, mcp, win32com.client" 2>$null
+                python -c "import openpyxl, docx, pptx, mcp, win32com.client, psutil, formulas, msal, pdf2image, lxml" 2>$null
                 $LASTEXITCODE -eq 0
             }
             install = {
                 python -m pip install --upgrade pip 2>$null
-                python -m pip install openpyxl python-docx python-pptx pywin32 mcp 2>$null
+                python -m pip install openpyxl python-docx python-pptx pywin32 mcp psutil formulas msal pdf2image lxml 2>$null
             }
         }
     )
@@ -423,6 +423,126 @@ function Run-InitialSetup {
     Write-Host "  Para usar microfone: ollama serve & Ctrl+R" -ForegroundColor Gray
     Write-Host ""
     return $true
+}
+
+# ============================================================================
+# CORRECAO DINAMICA DE CAMINHOS NO CONFIG (roda sempre)
+# ============================================================================
+
+function Update-OpenCodeConfig {
+    $configFile = Join-Path $OPENCODE_CONFIG "opencode.jsonc"
+
+    $mcpScriptPath = (Join-Path $OPENCODE_HOME "scripts\office_mcp.py") -replace '\\', '/'
+    $projectMcpPath = (Join-Path $OPENCODE_HOME "scripts\project_generator.py") -replace '\\', '/'
+
+    if (-not (Test-Path $configFile)) {
+        Write-Log "CONFIG" "MISSING" @{ action = "WILL_CREATE" } "WARN"
+        # Criar config padrao completo
+        $endpoint = "http://localhost:11434/v1"
+        $model = "llama3.2"
+        if ($env:GROQ_API_KEY) {
+            $endpoint = "https://api.groq.com/openai/v1"
+            $model = "llama3-8b-8192"
+        }
+        $voiceCfg = [ordered]@{ endpoint = $endpoint; model = $model }
+        if ($env:GROQ_API_KEY) { $voiceCfg.Add("apiKey", $env:GROQ_API_KEY) }
+
+        $configObj = [ordered]@{
+            "`$schema" = "https://opencode.ai/config.json"
+            plugin = @(
+                @("@renjfk/opencode-voice", $voiceCfg),
+                "multitask",
+                "multitask-tui.tsx",
+                "workspace-tui.tsx",
+                "auto-switch-mode.ts"
+            )
+            mcp = [ordered]@{
+                "office-mcp" = [ordered]@{ type = "local"; command = @("python", $mcpScriptPath); enabled = $true }
+                "project-mcp" = [ordered]@{ type = "local"; command = @("python", $projectMcpPath); enabled = $true }
+            }
+        }
+        $configObj | ConvertTo-Json -Depth 10 | Set-Content -Path $configFile -Encoding UTF8
+        Write-Log "CONFIG" "CREATED" @{ office_mcp = $mcpScriptPath; project_mcp = $projectMcpPath }
+        return
+    }
+
+    # Ler config existente e corrigir caminhos MCP
+    try {
+        $raw = Get-Content $configFile -Raw -Encoding UTF8
+        # Remover comentarios JSONC (linhas // e blocos /* */)
+        $jsonClean = $raw -replace '//.*', '' -replace '/\*[\s\S]*?\*/', ''
+        $cfg = $jsonClean | ConvertFrom-Json
+
+        $changed = $false
+
+        # Corrigir office-mcp
+        if ($cfg.mcp.'office-mcp') {
+            $currentCmd = $cfg.mcp.'office-mcp'.command
+            if ($currentCmd -is [System.Array] -and $currentCmd.Count -ge 2) {
+                if ($currentCmd[1] -ne $mcpScriptPath) {
+                    Write-Log "CONFIG" "PATH_FIX" @{ server = "office-mcp"; old = $currentCmd[1]; new = $mcpScriptPath } "WARN"
+                    $cfg.mcp.'office-mcp'.command = @("python", $mcpScriptPath)
+                    $changed = $true
+                }
+            }
+        } else {
+            Write-Log "CONFIG" "MCP_MISSING" @{ server = "office-mcp"; action = "ADDING" } "WARN"
+            $cfg.mcp | Add-Member -NotePropertyName 'office-mcp' -NotePropertyValue ([PSCustomObject]@{ type = "local"; command = @("python", $mcpScriptPath); enabled = $true }) -Force
+            $changed = $true
+        }
+
+        # Corrigir project-mcp
+        if ($cfg.mcp.'project-mcp') {
+            $currentCmd = $cfg.mcp.'project-mcp'.command
+            if ($currentCmd -is [System.Array] -and $currentCmd.Count -ge 2) {
+                if ($currentCmd[1] -ne $projectMcpPath) {
+                    Write-Log "CONFIG" "PATH_FIX" @{ server = "project-mcp"; old = $currentCmd[1]; new = $projectMcpPath } "WARN"
+                    $cfg.mcp.'project-mcp'.command = @("python", $projectMcpPath)
+                    $changed = $true
+                }
+            }
+        } else {
+            Write-Log "CONFIG" "MCP_MISSING" @{ server = "project-mcp"; action = "ADDING" } "WARN"
+            $cfg.mcp | Add-Member -NotePropertyName 'project-mcp' -NotePropertyValue ([PSCustomObject]@{ type = "local"; command = @("python", $projectMcpPath); enabled = $true }) -Force
+            $changed = $true
+        }
+
+        if ($changed) {
+            $cfg | ConvertTo-Json -Depth 10 | Set-Content -Path $configFile -Encoding UTF8
+            Write-Log "CONFIG" "UPDATED" @{ office_mcp = $mcpScriptPath; project_mcp = $projectMcpPath }
+        } else {
+            Write-Log "CONFIG" "OK" @{ office_mcp = $mcpScriptPath; project_mcp = $projectMcpPath }
+        }
+    }
+    catch {
+        Write-Log "CONFIG" "PARSE_ERROR" @{ error = $_.Exception.Message } "ERROR"
+        # Recriar config do zero se parse falhar
+        $endpoint = "http://localhost:11434/v1"
+        $model = "llama3.2"
+        if ($env:GROQ_API_KEY) {
+            $endpoint = "https://api.groq.com/openai/v1"
+            $model = "llama3-8b-8192"
+        }
+        $voiceCfg = [ordered]@{ endpoint = $endpoint; model = $model }
+        if ($env:GROQ_API_KEY) { $voiceCfg.Add("apiKey", $env:GROQ_API_KEY) }
+
+        $configObj = [ordered]@{
+            "`$schema" = "https://opencode.ai/config.json"
+            plugin = @(
+                @("@renjfk/opencode-voice", $voiceCfg),
+                "multitask",
+                "multitask-tui.tsx",
+                "workspace-tui.tsx",
+                "auto-switch-mode.ts"
+            )
+            mcp = [ordered]@{
+                "office-mcp" = [ordered]@{ type = "local"; command = @("python", $mcpScriptPath); enabled = $true }
+                "project-mcp" = [ordered]@{ type = "local"; command = @("python", $projectMcpPath); enabled = $true }
+            }
+        }
+        $configObj | ConvertTo-Json -Depth 10 | Set-Content -Path $configFile -Encoding UTF8
+        Write-Log "CONFIG" "RECREATED" @{ reason = "PARSE_FAILURE"; office_mcp = $mcpScriptPath; project_mcp = $projectMcpPath } "WARN"
+    }
 }
 
 # ============================================================================
@@ -703,9 +823,62 @@ else {
         exit 1
     }
 }
+# 1.5. Verificar se ha atualizacao disponivel
+if ($exeStatus.valid) {
+    $latestVersion = Get-LatestVersion
+    $localVersion = $exeStatus.version
+
+    if ($latestVersion -and $localVersion -and ($latestVersion -ne $localVersion)) {
+        Write-Host "" -ForegroundColor Yellow
+        Write-Host "============================================" -ForegroundColor Yellow
+        Write-Host "  Nova versao disponivel!" -ForegroundColor Yellow
+        Write-Host "============================================" -ForegroundColor Yellow
+        Write-Host "  Instalada:  v$localVersion" -ForegroundColor Gray
+        Write-Host "  Disponivel: v$latestVersion" -ForegroundColor Green
+        Write-Host ""
+        Write-Log "UPDATE" "AVAILABLE" @{ local = $localVersion; latest = $latestVersion }
+
+        $choice = Read-Host "  Deseja atualizar agora? (S/N)"
+        if ($choice -match '^[sS]') {
+            Write-Log "UPDATE" "ACCEPTED" @{ from = $localVersion; to = $latestVersion }
+            Remove-Item $exePath -Force -ErrorAction SilentlyContinue
+            $downloaded = Download-OpenCodeExe $latestVersion
+            if ($downloaded) {
+                $newStatus = Test-OpenCodeExe $exePath
+                Write-Host ""
+                Write-Host "  Atualizado com sucesso! v$localVersion -> v$($newStatus.version)" -ForegroundColor Green
+                Write-Host ""
+                Write-Log "UPDATE" "SUCCESS" @{ from = $localVersion; to = $newStatus.version }
+            }
+            else {
+                Write-Host ""
+                Write-Host "  [ERRO] Falha ao atualizar. Baixando versao anterior..." -ForegroundColor Red
+                Write-Log "UPDATE" "FAILED" @{ target = $latestVersion } "ERROR"
+                # Tentar restaurar a versao anterior
+                $downloaded = Download-OpenCodeExe $localVersion
+                if (-not $downloaded) {
+                    Write-Host "  [ERRO FATAL] Nao foi possivel restaurar. Verifique sua conexao." -ForegroundColor Red
+                    Read-Host "Pressione Enter para sair"
+                    exit 1
+                }
+            }
+        }
+        else {
+            Write-Log "UPDATE" "DECLINED" @{ local = $localVersion; latest = $latestVersion }
+            Write-Host "  Continuando com v$localVersion..." -ForegroundColor Gray
+            Write-Host ""
+        }
+    }
+    else {
+        Write-Log "UPDATE" "UP_TO_DATE" @{ version = $localVersion }
+    }
+}
 
 # 2. Setup inicial (se necessario)
 $setupDone = Run-InitialSetup
+
+# 2.5. Corrigir caminhos MCP no config (roda sempre, mesmo apos setup)
+Update-OpenCodeConfig
 
 # 3. Seletor de projetos
 $providedPath = ""
