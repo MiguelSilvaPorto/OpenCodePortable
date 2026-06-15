@@ -551,9 +551,13 @@ if %errorlevel% neq 0 (
     echo [HEALTH] OK: Ollama
 )
 
-:: 9. Criar tui.json com configuracao do voice plugin (se nao existir)
-if not exist ".opencode\tui.json" (
-    echo [HEALTH] Criando configuracao do voice plugin...
+:: 9. Criar tui.json com configuracao do voice plugin (global e local)
+:: Criar diretorio global se nao existir
+if not exist "%USERPROFILE%\.config\opencode" mkdir "%USERPROFILE%\.config\opencode"
+
+:: Criar tui.json global (OpenCode le daqui para plugins TUI)
+if not exist "%USERPROFILE%\.config\opencode\tui.json" (
+    echo [HEALTH] Criando configuracao do voice plugin (global)...
     (
         echo {
         echo   "$schema": "https://opencode.ai/tui.json",
@@ -568,8 +572,8 @@ if not exist ".opencode\tui.json" (
         echo     }]
         echo   ]
         echo }
-    ) > ".opencode\tui.json"
-    echo [HEALTH] OK: tui.json criado
+    ) > "%USERPROFILE%\.config\opencode\tui.json"
+    echo [HEALTH] OK: tui.json global criado
 )
 
 goto :eof
