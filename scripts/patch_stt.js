@@ -34,7 +34,7 @@ patchFile(indexFile, (content) => {
 });
 console.log('[PATCH] index.js successfully patched.');
 
-// 2. Patch llm-client.js to support dynamic configurations from kv
+// 2. Patch llm-client.js to support dynamic configurations from kv and prioritize explicit apiKey
 patchFile(llmClientFile, (content) => {
   // Update createClient declaration
   content = content.replace(
@@ -74,15 +74,16 @@ patchFile(llmClientFile, (content) => {
 
   content = content.replace(originalGetConfig, patchedGetConfig);
 
+  // Prioritize explicit apiKey over environment variable apiKeyEnv
   const originalKeyLine = 'const apiKey = cfg.apiKeyEnv ? process.env[cfg.apiKeyEnv] : null;';
-  const patchedKeyLine = 'const apiKey = (cfg.apiKeyEnv ? process.env[cfg.apiKeyEnv] : null) || cfg.apiKey || null;';
+  const patchedKeyLine = 'const apiKey = cfg.apiKey || (cfg.apiKeyEnv ? process.env[cfg.apiKeyEnv] : null) || null;';
   content = content.replace(originalKeyLine, patchedKeyLine);
 
   return content;
 });
 console.log('[PATCH] llm-client.js successfully patched.');
 
-// 3. Patch stt.js to support dynamic STT configs and /voice menu command
+// 3. Patch stt.js to support dynamic STT configs, /voice menu command, and prioritize explicit apiKey
 patchFile(sttFile, (content) => {
   // Import https at the top
   content = 'import https from "node:https";\n' + content;
@@ -443,8 +444,8 @@ function getClipboardText() {
 
   content = content.replace(originalTranscribe, patchedTranscribe);
 
-  // Replace transcribeApi function to support API language specification and dynamic configs from KV
-  const originalTranslateApi = `async function transcribeApi(kv) {
+  // Replace transcribeApi function to support API language specification and dynamic configs from KV, prioritizing explicit apiKey
+  const originalTranscribeApi = `async function transcribeApi(kv) {
   if (!sttApiEndpoint || !sttApiModel) {
     return { error: "STT API not configured" };
   }
@@ -535,7 +536,7 @@ function getClipboardText() {
       : \`\${apiEndpoint}/audio/transcriptions\`;
 
     const headers = {};
-    const apiKey = (apiKeyEnvName ? process.env[apiKeyEnvName] : null) || sttApiKeyVal;
+    const apiKey = sttApiKeyVal || (apiKeyEnvName ? process.env[apiKeyEnvName] : null) || null;
     if (apiKey) headers["Authorization"] = "Bearer " + apiKey;
 
     const resp = await fetch(url, {
@@ -565,9 +566,9 @@ function getClipboardText() {
   }
 }`;
 
-  content = content.replace(originalTranslateApi, patchedTranscribeApi);
+  content = content.replace(originalTranscribeApi, patchedTranscribeApi);
 
-  // Set sttApiKeyVal when registerSTT is run
+  // Set sttApiKeyVal when registerSTT is run and update dynamic sttApiEndpoint resolve in pipeline
   const originalRegisterBlock = `  if (opts?.sttEndpoint) {
     sttApiEndpoint = opts.sttEndpoint;
     sttApiModel = opts.sttModel || "whisper-large-v3-turbo";
@@ -788,6 +789,7 @@ function getClipboardText() {
                     const clipboardKey = getClipboardText();
                     if (clipboardKey && clipboardKey.startsWith("gsk_")) {
                       kv.set("stt.apiKey", clipboardKey);
+                      sttApiKeyVal = clipboardKey; // Also update active key variable immediately
                       toast("Chave de API do Groq colada com sucesso!", "success");
                     } else if (clipboardKey) {
                       toast("Erro: Conteúdo da área de transferência não começa com 'gsk_'", "error");
