@@ -378,13 +378,11 @@ function Run-InitialSetup {
         "endpoint" = $endpoint
         "model" = $model
     }
-    if ($apiKey) {
-        $voiceConfig.Add("apiKey", $apiKey)
-        if ($env:GROQ_API_KEY) {
-            $voiceConfig.Add("sttEndpoint", "https://api.groq.com/openai/v1")
-            $voiceConfig.Add("sttModel", "whisper-large-v3-turbo")
-            $voiceConfig.Add("sttApiKeyEnv", "GROQ_API_KEY")
-        }
+    if ($env:GROQ_API_KEY) {
+        $voiceConfig.Add("apiKeyEnv", "GROQ_API_KEY")
+        $voiceConfig.Add("sttEndpoint", "https://api.groq.com/openai/v1")
+        $voiceConfig.Add("sttModel", "whisper-large-v3-turbo")
+        $voiceConfig.Add("sttApiKeyEnv", "GROQ_API_KEY")
     }
 
     Write-Log "SETUP" "CONFIG_WRITE" @{ file = $configFile; office_mcp_path = $mcpScriptPathJson; project_mcp_path = $projectMcpScriptPathJson }
@@ -451,7 +449,7 @@ function Update-OpenCodeConfig {
         }
         $voiceCfg = [ordered]@{ endpoint = $endpoint; model = $model }
         if ($env:GROQ_API_KEY) { 
-            $voiceCfg.Add("apiKey", $env:GROQ_API_KEY)
+            $voiceCfg.Add("apiKeyEnv", "GROQ_API_KEY")
             $voiceCfg.Add("sttEndpoint", "https://api.groq.com/openai/v1")
             $voiceCfg.Add("sttModel", "whisper-large-v3-turbo")
             $voiceCfg.Add("sttApiKeyEnv", "GROQ_API_KEY")
@@ -521,8 +519,9 @@ function Update-OpenCodeConfig {
             foreach ($p in $cfg.plugin) {
                 if ($p -is [System.Array] -and $p.Count -ge 2 -and $p[0] -eq "@renjfk/opencode-voice") {
                     $voiceCfgObj = $p[1]
-                    if (-not $voiceCfgObj.sttEndpoint) {
+                    if (-not $voiceCfgObj.sttEndpoint -or -not $voiceCfgObj.apiKeyEnv) {
                         Write-Log "CONFIG" "VOICE_MIGRATE" @{ provider = "groq" } "WARN"
+                        $voiceCfgObj | Add-Member -NotePropertyName 'apiKeyEnv' -NotePropertyValue "GROQ_API_KEY" -Force
                         $voiceCfgObj | Add-Member -NotePropertyName 'sttEndpoint' -NotePropertyValue "https://api.groq.com/openai/v1" -Force
                         $voiceCfgObj | Add-Member -NotePropertyName 'sttModel' -NotePropertyValue "whisper-large-v3-turbo" -Force
                         $voiceCfgObj | Add-Member -NotePropertyName 'sttApiKeyEnv' -NotePropertyValue "GROQ_API_KEY" -Force
