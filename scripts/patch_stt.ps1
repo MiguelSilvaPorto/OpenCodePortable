@@ -7,7 +7,7 @@ $llmFile = Join-Path $cacheDir "node_modules\@renjfk\opencode-voice\lib\llm-clie
 $llmContent = if (Test-Path $llmFile) { Get-Content $llmFile -Raw } else { "" }
 if (Test-Path $sttFile) {
     $content = Get-Content $sttFile -Raw
-    if (($content -match "DialogInput") -or ($content -notmatch 'kv\.get\("stt\.apiKey"\)') -or ($content -notmatch "llama-3.1-8b-instant") -or ($content -notmatch 'stt\.llmModel"\) === "llama3-8b-8192"') -or ($llmContent -and $llmContent -notmatch "groq.com")) {
+    if (($content -match "DialogInput") -or ($content -notmatch 'kv\.get\("stt\.apiKey"\)') -or ($content -notmatch "llama-3.1-8b-instant") -or ($content -notmatch 'stt\.llmModel"\) === "llama3-8b-8192"') -or ($llmContent -and $llmContent -notmatch "llama3-8b-8192")) {
         Write-Host "[HEALTH] Cache desatualizado detectado. Limpando cache para reinstalar..." -ForegroundColor Yellow
         Remove-Item (Join-Path $cacheDir "node_modules") -Recurse -Force -ErrorAction SilentlyContinue
     }
