@@ -791,7 +791,7 @@ function getClipboardText() {
                               kv.set("stt.sttEndpoint", "https://api.groq.com/openai/v1");
                               kv.set("stt.sttModel", "whisper-large-v3-turbo");
                               kv.set("stt.endpoint", "https://api.groq.com/openai/v1");
-                              kv.set("stt.llmModel", "llama3-8b-8192");
+                              kv.set("stt.llmModel", "llama-3.1-8b-instant");
                               kv.set("stt.sttApiKeyEnv", "GROQ_API_KEY");
                               const envKey = process.env.GROQ_API_KEY || "";
                               if (envKey) {
@@ -890,7 +890,7 @@ function getClipboardText() {
                         api.ui.DialogSelect({
                           title: "Select Groq LLM Model",
                           options: [
-                            { title: "llama3-8b-8192 (Default)", value: "llama3-8b-8192", onSelect() { kv.set("stt.llmModel", "llama3-8b-8192"); toast("Modelo: llama3-8b-8192"); showMainMenu(); } },
+                            { title: "llama-3.1-8b-instant (Default)", value: "llama-3.1-8b-instant", onSelect() { kv.set("stt.llmModel", "llama-3.1-8b-instant"); toast("Modelo: llama-3.1-8b-instant"); showMainMenu(); } },
                             { title: "llama-3.3-70b-versatile", value: "llama-3.3-70b-versatile", onSelect() { kv.set("stt.llmModel", "llama-3.3-70b-versatile"); toast("Modelo: llama-3.3-70b-versatile"); showMainMenu(); } },
                             { title: "mixtral-8x7b-32768", value: "mixtral-8x7b-32768", onSelect() { kv.set("stt.llmModel", "mixtral-8x7b-32768"); toast("Modelo: mixtral-8x7b-32768"); showMainMenu(); } }
                           ]
