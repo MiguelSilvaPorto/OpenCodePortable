@@ -90,6 +90,16 @@ if (!cfg) {
             }
         }
     }
+    // Migrar modelo antigo/descontinuado no config se existir
+    if (cfg.plugin && Array.isArray(cfg.plugin)) {
+        let voicePlugin = cfg.plugin.find(p => Array.isArray(p) && p[0] === "@renjfk/opencode-voice");
+        if (voicePlugin && voicePlugin[1]) {
+            const voiceCfg = voicePlugin[1];
+            if (voiceCfg.model === "llama3-8b-8192") {
+                voiceCfg.model = "llama-3.1-8b-instant";
+            }
+        }
+    }
 }
 
 // Escrever de volta com indentação limpa e formato JSON correto
