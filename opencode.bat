@@ -565,7 +565,7 @@ if not exist "%USERPROFILE%\.config\opencode\tui.json" (
     call :create_tui_json
 )
 
-:: 10. Corrigir filtro de dispositivos de audio no voice plugin
+:: 10. Corrigir filtro de dispositivos de audio no voice plugin e adicionar fallback do SoX
 set "STT_FILE=%USERPROFILE%\.cache\opencode\packages\@renjfk\opencode-voice@latest\node_modules\@renjfk\opencode-voice\lib\stt.js"
 if exist "%STT_FILE%" (
     findstr /c:"includes(\"audio\")" "%STT_FILE%" >nul 2>&1
@@ -573,6 +573,12 @@ if exist "%STT_FILE%" (
         echo [HEALTH] Corrigindo filtro de dispositivos de audio...
         powershell -NoProfile -Command "$f='%STT_FILE%'; $c=Get-Content $f -Raw; $c=$c.Replace('l.toLowerCase().includes(\"micro\")','l.toLowerCase().includes(\"micro\") || l.toLowerCase().includes(\"audio\") || l.toLowerCase().includes(\"usb\") || l.toLowerCase().includes(\"input\")'); Set-Content $f $c -NoNewline -Encoding UTF8"
         echo [HEALTH] OK: Filtro de dispositivos corrigido
+    )
+    findstr /c:"recording failed, retrying with default device" "%STT_FILE%" >nul 2>&1
+    if errorlevel 1 (
+        echo [HEALTH] Aplicando fallback do driver de audio SoX ( waveaudio -^> default )...
+        powershell -NoProfile -Command "$f='%STT_FILE%'; $c=Get-Content $f -Raw; $target = '  soxProc = spawn(\r?\n    \"sox\",\r?\n    \[\"--buffer\", \"2048\", ...inputArgs, \"-r\", \"16000\", \"-c\", \"1\", \"-b\", \"16\", WAV_FILE\],'; $replace = '  // Fallback se waveaudio falhar\r\n  let isFallback = false;\r\n  if (process.platform === \"win32\" && inputArgs[1] === \"waveaudio\" && inputArgs[2] === \"default\") {\r\n    // Se der erro de default audio device, tentamos rodar o SoX sem waveaudio (so com -d)\r\n  }\r\n  soxProc = spawn(\r\n    \"sox\",\r\n    [\"--buffer\", \"2048\", ...inputArgs, \"-r\", \"16000\", \"-c\", \"1\", \"-b\", \"16\", WAV_FILE\],'; $c = $c -replace \$target, \$replace; $c = $c.Replace('toast(`Recording error: ${errLine || `sox exited (code=${code})`}`, \"error\");', 'if (!isFallback && errLine && errLine.includes(\"no default audio device\")) {\r\n        isFallback = true;\r\n        console.log(\"[stt] waveaudio default failed, retrying with default device -d...\");\r\n        inputArgs = [\"-d\"];\r\n        startRecording(kv, toast, client);\r\n      } else {\r\n        toast(`Recording error: ${errLine || `sox exited (code=${code})`}`, \"error\");\r\n      }'); Set-Content $f $c -NoNewline -Encoding UTF8"
+        echo [HEALTH] OK: Fallback do SoX aplicado com sucesso!
     )
 )
 
