@@ -79,6 +79,41 @@ patchFile(llmClientFile, (content) => {
   const patchedKeyLine = 'const apiKey = cfg.apiKey || (cfg.apiKeyEnv ? process.env[cfg.apiKeyEnv] : null) || null;';
   content = content.replace(originalKeyLine, patchedKeyLine);
 
+  // Sanitize request body parameters for Groq Cloud to prevent 400 Bad Request on custom properties
+  content = content.replace(
+    'if (cfg.reasoningEffort) body.reasoning_effort = cfg.reasoningEffort;',
+    'if (cfg.reasoningEffort && !endpoint.includes("groq.com")) body.reasoning_effort = cfg.reasoningEffort;'
+  );
+  content = content.replace(
+    'if (cfg.chatTemplateKwargs) body.chat_template_kwargs = cfg.chatTemplateKwargs;',
+    'if (cfg.chatTemplateKwargs && !endpoint.includes("groq.com")) body.chat_template_kwargs = cfg.chatTemplateKwargs;'
+  );
+
+  // Extract precise error messages from JSON error responses (like 400/401 errors from APIs)
+  const originalErrorBlock = `        if (!response.ok) {
+          if (attempt < cfg.retries && shouldRetry(response.status)) {
+            await wait(250 * 2 ** attempt);
+            continue;
+          }
+          return { text: null, error: \`LLM request failed (\${response.status})\` };
+        }`;
+
+  const patchedErrorBlock = `        if (!response.ok) {
+          if (attempt < cfg.retries && shouldRetry(response.status)) {
+            await wait(250 * 2 ** attempt);
+            continue;
+          }
+          let errorMsg = \`LLM request failed (\${response.status})\`;
+          try {
+            const errBody = await response.text();
+            const errObj = JSON.parse(errBody);
+            errorMsg = errObj?.error?.message || errObj?.message || errorMsg;
+          } catch {}
+          return { text: null, error: errorMsg };
+        }`;
+
+  content = content.replace(originalErrorBlock, patchedErrorBlock);
+
   return content;
 });
 console.log('[PATCH] llm-client.js successfully patched.');
