@@ -790,27 +790,33 @@ function getClipboardText() {
                   title: \`3. Adicionar Groq API Key (Digitar/Colar)\`,
                   value: "voice.add_key",
                   onSelect() {
-                    // Tenta usar DialogInput nativo do OpenCode
-                    api.ui.dialog.replace(() =>
-                      api.ui.DialogInput({
-                        title: "Adicionar Groq API Key / Add Groq Key",
-                        placeholder: "gsk_...",
-                        onSubmit(value) {
-                          const cleanKey = (value || "").trim().replace(/[^a-zA-Z0-9_-]/g, "");
-                          if (cleanKey && cleanKey.startsWith("gsk_")) {
-                            kv.set("stt.apiKey", cleanKey);
-                            sttApiKeyVal = cleanKey;
-                            toast("Chave salva com sucesso!", "success");
-                          } else {
-                            toast("Chave inválida! Deve começar com gsk_", "error");
+                    if (typeof api.ui.DialogPrompt === "function") {
+                      api.ui.dialog.replace(() =>
+                        api.ui.DialogPrompt({
+                          title: "Adicionar Groq API Key / Add Groq Key",
+                          placeholder: "gsk_...",
+                          onConfirm(value) {
+                            const cleanKey = (value || "").trim().replace(/[^a-zA-Z0-9_-]/g, "");
+                            if (cleanKey && cleanKey.startsWith("gsk_")) {
+                              kv.set("stt.apiKey", cleanKey);
+                              sttApiKeyVal = cleanKey;
+                              toast("Chave salva com sucesso!", "success");
+                            } else {
+                              toast("Chave inválida! Deve começar com gsk_", "error");
+                            }
+                            showMainMenu();
+                          },
+                          onCancel() {
+                            showMainMenu();
+                          },
+                          onClose() {
+                            showMainMenu();
                           }
-                          showMainMenu();
-                        },
-                        onCancel() {
-                          showMainMenu();
-                        }
-                      })
-                    );
+                        })
+                      );
+                    } else {
+                      toast("Caixa de entrada de texto nao suportada nesta versao do TUI.", "error");
+                    }
                   }
                 },
                 {
@@ -823,9 +829,9 @@ function getClipboardText() {
                       sttApiKeyVal = clipboardKey;
                       toast("Chave de API do Groq colada com sucesso!", "success");
                     } else if (clipboardKey) {
-                      toast("Erro: Conteúdo da área de transferência não começa com 'gsk_'", "error");
+                      toast("Erro: Conteúdo não começa com 'gsk_'. Certifique-se de copiar a chave gsk_ primeiro.", "error");
                     } else {
-                      toast("Área de transferência vazia", "warning");
+                      toast("Área de transferência vazia ou comando de cópia falhou", "warning");
                     }
                     showMainMenu();
                   }
@@ -943,4 +949,4 @@ function getClipboardText() {
   return content;
 });
 
-console.log('[PATCH] stt.js successfully patched with simulated recording, language config, clipboard integration, reset option, and /voice menu.');
+console.log('[PATCH] stt.js successfully patched with simulated recording, language config, clipboard integration, safe input dialogs, and /voice menu.');
