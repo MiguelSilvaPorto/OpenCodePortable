@@ -717,6 +717,7 @@ function getClipboardText() {
           const provider = kv.get("stt.provider") || (sttApiEndpoint ? "groq" : "ollama");
           const language = kv.get("stt.language", "pt");
           const mic = kv.get("stt.mic", "") || "System default";
+          const hasKey = !!(kv.get("stt.apiKey") || sttApiKeyVal);
           
           api.ui.dialog.replace(() =>
             api.ui.DialogSelect({
@@ -786,13 +787,40 @@ function getClipboardText() {
                   }
                 },
                 {
-                  title: "3. Colar Groq API Key da Área de Transferência (Clipboard)",
+                  title: \`3. Adicionar Groq API Key (Digitar/Colar)\`,
+                  value: "voice.add_key",
+                  onSelect() {
+                    // Tenta usar DialogInput nativo do OpenCode
+                    api.ui.dialog.replace(() =>
+                      api.ui.DialogInput({
+                        title: "Adicionar Groq API Key / Add Groq Key",
+                        placeholder: "gsk_...",
+                        onSubmit(value) {
+                          const cleanKey = (value || "").trim().replace(/[^a-zA-Z0-9_-]/g, "");
+                          if (cleanKey && cleanKey.startsWith("gsk_")) {
+                            kv.set("stt.apiKey", cleanKey);
+                            sttApiKeyVal = cleanKey;
+                            toast("Chave salva com sucesso!", "success");
+                          } else {
+                            toast("Chave inválida! Deve começar com gsk_", "error");
+                          }
+                          showMainMenu();
+                        },
+                        onCancel() {
+                          showMainMenu();
+                        }
+                      })
+                    );
+                  }
+                },
+                {
+                  title: \`4. Colar Groq API Key da Área de Transferência (Clipboard)\`,
                   value: "voice.paste_key",
                   onSelect() {
                     const clipboardKey = getClipboardText();
                     if (clipboardKey && clipboardKey.startsWith("gsk_")) {
                       kv.set("stt.apiKey", clipboardKey);
-                      sttApiKeyVal = clipboardKey; // Also update active key variable immediately
+                      sttApiKeyVal = clipboardKey;
                       toast("Chave de API do Groq colada com sucesso!", "success");
                     } else if (clipboardKey) {
                       toast("Erro: Conteúdo da área de transferência não começa com 'gsk_'", "error");
@@ -803,7 +831,17 @@ function getClipboardText() {
                   }
                 },
                 {
-                  title: "4. Selecionar Modelo LLM (Groq/Ollama)",
+                  title: \`5. Resetar Groq API Key [Status: \${hasKey ? "Configurada" : "Vazia"}]\`,
+                  value: "voice.reset_key",
+                  onSelect() {
+                    kv.set("stt.apiKey", "");
+                    sttApiKeyVal = null;
+                    toast("Chave de API do Groq resetada/limpa!", "success");
+                    showMainMenu();
+                  }
+                },
+                {
+                  title: "6. Selecionar Modelo LLM (Groq/Ollama)",
                   value: "voice.llm_model",
                   onSelect() {
                     if (provider === "groq") {
@@ -832,7 +870,7 @@ function getClipboardText() {
                   }
                 },
                 {
-                  title: "5. Selecionar Modelo Whisper (Local)",
+                  title: "7. Selecionar Modelo Whisper (Local)",
                   value: "voice.whisper_model",
                   onSelect() {
                     const currentModel = getModelName(kv);
@@ -853,7 +891,7 @@ function getClipboardText() {
                   }
                 },
                 {
-                  title: \`6. Microfone (Mic): [\${mic}]\`,
+                  title: \`8. Microfone (Mic): [\${mic}]\`,
                   value: "voice.mic",
                   onSelect() {
                     const currentMic = kv.get("stt.mic", "");
@@ -905,4 +943,4 @@ function getClipboardText() {
   return content;
 });
 
-console.log('[PATCH] stt.js successfully patched with simulated recording, language config, clipboard integration, and /voice menu.');
+console.log('[PATCH] stt.js successfully patched with simulated recording, language config, clipboard integration, reset option, and /voice menu.');
