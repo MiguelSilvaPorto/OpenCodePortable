@@ -58,7 +58,7 @@ patchFile(llmClientFile, (content) => {
   }`;
 
   const patchedGetConfig = `  function getConfig() {
-    return {
+    const rawCfg = {
       endpoint: kv?.get("stt.endpoint") || pluginOptions?.endpoint,
       model: kv?.get("stt.llmModel") || pluginOptions?.model,
       apiKeyEnv: kv?.get("stt.sttApiKeyEnv") !== undefined ? kv.get("stt.sttApiKeyEnv") : pluginOptions?.apiKeyEnv,
@@ -70,6 +70,10 @@ patchFile(llmClientFile, (content) => {
       ),
       retries: normalizeRetries(pluginOptions?.retries ?? DEFAULTS.retries),
     };
+    if (rawCfg.model === "llama3-8b-8192") {
+      rawCfg.model = "llama-3.1-8b-instant";
+    }
+    return rawCfg;
   }`;
 
   content = content.replace(originalGetConfig, patchedGetConfig);
