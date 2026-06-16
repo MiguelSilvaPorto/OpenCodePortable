@@ -24,7 +24,7 @@ try {
 
 const defaultVoiceCfg = {
     endpoint: process.env.GROQ_API_KEY ? "https://api.groq.com/openai/v1" : "http://localhost:11434/v1",
-    model: process.env.GROQ_API_KEY ? "llama3-8b-8192" : "llama3.2"
+    model: process.env.GROQ_API_KEY ? "llama-3.1-8b-instant" : "llama3.2"
 };
 
 if (process.env.GROQ_API_KEY) {
