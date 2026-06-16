@@ -573,7 +573,7 @@ function getClipboardText() {
       : \`\${apiEndpoint}/audio/transcriptions\`;
 
     const headers = {};
-    const apiKey = sttApiKeyVal || (apiKeyEnvName ? process.env[apiKeyEnvName] : null) || null;
+    const apiKey = kv.get("stt.apiKey") || sttApiKeyVal || (apiKeyEnvName ? process.env[apiKeyEnvName] : null) || null;
     if (apiKey) headers["Authorization"] = "Bearer " + apiKey;
 
     const resp = await fetch(url, {
