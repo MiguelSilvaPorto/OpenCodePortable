@@ -807,6 +807,37 @@ Write-Log "SYSTEM" "START" @{
     args = if ($Arguments) { $Arguments -join " " } else { "" }
 }
 
+# Verificar comando para configurar a API do Groq
+if ($Arguments -and ($Arguments[0] -eq "--set-groq" -or $Arguments[0] -eq "-groq")) {
+    $groqKey = ""
+    if ($Arguments.Count -gt 1) {
+        $groqKey = $Arguments[1]
+    } else {
+        $groqKey = Read-Host "Digite sua Groq API Key"
+    }
+
+    if ($groqKey -match '^gsk_') {
+        # Configurar variavel de ambiente do usuario (persistente)
+        [Environment]::SetEnvironmentVariable("GROQ_API_KEY", $groqKey, "User")
+        $env:GROQ_API_KEY = $groqKey
+        
+        # Garantir pasta de configuracao e forcar atualizacao da config
+        if (-not (Test-Path $OPENCODE_CONFIG)) { New-Item -ItemType Directory -Path $OPENCODE_CONFIG -Force | Out-Null }
+        Update-OpenCodeConfig
+        
+        Write-Host ""
+        Write-Host "============================================" -ForegroundColor Green
+        Write-Host "  Groq API Key configurada com sucesso!" -ForegroundColor Green
+        Write-Host "============================================" -ForegroundColor Green
+        Write-Host "  A chave foi salva nas variaveis de ambiente" -ForegroundColor Gray
+        Write-Host "  e o arquivo de configuracao foi atualizado." -ForegroundColor Gray
+        Write-Host ""
+        exit 0
+    } else {
+        Write-Host "[ERRO] Chave invalida. A chave da Groq deve comecar com 'gsk_'." -ForegroundColor Red
+        exit 1
+    }
+}
 
 # Garantir diretorios
 if (-not (Test-Path $OPENCODE_BIN))  { New-Item -ItemType Directory -Path $OPENCODE_BIN -Force | Out-Null }
