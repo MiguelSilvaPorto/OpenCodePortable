@@ -4,37 +4,50 @@ const os = require('os');
 
 const cacheDir = path.join(os.homedir(), '.cache', 'opencode', 'packages', '@renjfk', 'opencode-voice@latest');
 const sttFile = path.join(cacheDir, 'node_modules', '@renjfk', 'opencode-voice', 'lib', 'stt.js');
-const backupFile = sttFile + '.bak';
+const llmClientFile = path.join(cacheDir, 'node_modules', '@renjfk', 'opencode-voice', 'lib', 'llm-client.js');
 
-if (!fs.existsSync(sttFile)) {
-  console.log('[PATCH] stt.js not found, skipping patching.');
-  process.exit(0);
+// Helper to safely restore from backup and read/write patched contents
+function patchFile(filePath, patchFn) {
+  if (!fs.existsSync(filePath)) {
+    console.log(`[PATCH] File not found: ${filePath}`);
+    return;
+  }
+  const backupFile = filePath + '.bak';
+  if (fs.existsSync(backupFile)) {
+    fs.copyFileSync(backupFile, filePath);
+  } else {
+    fs.copyFileSync(filePath, backupFile);
+  }
+  let content = fs.readFileSync(filePath, 'utf8');
+  content = content.replace(/\r\n/g, '\n');
+  content = patchFn(content);
+  fs.writeFileSync(filePath, content, 'utf8');
 }
 
-// Ensure clean restore from backup to avoid cumulative patching issues
-if (fs.existsSync(backupFile)) {
-  fs.copyFileSync(backupFile, sttFile);
-} else {
-  fs.copyFileSync(sttFile, backupFile);
-}
+// 1. Patch llm-client.js to support direct apiKey option fallback
+patchFile(llmClientFile, (content) => {
+  const originalKeyLine = 'const apiKey = cfg.apiKeyEnv ? process.env[cfg.apiKeyEnv] : null;';
+  const patchedKeyLine = 'const apiKey = (cfg.apiKeyEnv ? process.env[cfg.apiKeyEnv] : null) || pluginOptions?.apiKey || null;';
+  return content.replace(originalKeyLine, patchedKeyLine);
+});
 
-let content = fs.readFileSync(sttFile, 'utf8');
+console.log('[PATCH] llm-client.js successfully patched.');
 
-// Normalize line endings to LF to ensure match patterns succeed reliably
-content = content.replace(/\r\n/g, '\n');
+// 2. Patch stt.js to support direct apiKey option fallback, language forcing, and simulated recording
+patchFile(sttFile, (content) => {
+  // Import https at the top
+  content = 'import https from "node:https";\n' + content;
 
-// 0. Import https module at the top
-content = 'import https from "node:https";\n' + content;
+  // Update WAV_FILE path
+  content = content.replace(
+    'const WAV_FILE = "/tmp/opencode-stt.wav";',
+    'const WAV_FILE = path.join(os.tmpdir(), "opencode-stt.wav");'
+  );
 
-// 1. Update WAV_FILE path
-content = content.replace(
-  'const WAV_FILE = "/tmp/opencode-stt.wav";',
-  'const WAV_FILE = path.join(os.tmpdir(), "opencode-stt.wav");'
-);
-
-// 2. Define global variables and writeSilentWav helper + downloadModel helper
-const helperCode = `
+  // Define global variables, writeSilentWav, downloadModel helpers and sttApiKeyVal
+  const helperCode = `
 let isSimulated = false;
+let sttApiKeyVal = null;
 
 function writeSilentWav(filePath) {
   try {
@@ -99,22 +112,22 @@ function downloadModel(modelFile, destPath, toast) {
 }
 `;
 
-content = content.replace('let soxProc = null;', 'let soxProc = null;\n' + helperCode);
+  content = content.replace('let soxProc = null;', 'let soxProc = null;\n' + helperCode);
 
-// Change default model to "base"
-content = content.replace(
-  'const DEFAULT_MODEL = "large-v3-turbo-q5_0";',
-  'const DEFAULT_MODEL = "base";'
-);
+  // Change default model to "base"
+  content = content.replace(
+    'const DEFAULT_MODEL = "large-v3-turbo-q5_0";',
+    'const DEFAULT_MODEL = "base";'
+  );
 
-// Add rule to preserve language to system prompt
-content = content.replace(
-  '- Keep the user\'s intent and meaning intact',
-  '- Keep the user\'s intent and meaning intact\n- ALWAYS respond/normalize in the language the user dictated (e.g. if dictated in Portuguese, output in Portuguese. Do NOT translate to English).'
-);
+  // Add rule to preserve language to system prompt
+  content = content.replace(
+    '- Keep the user\'s intent and meaning intact',
+    '- Keep the user\'s intent and meaning intact\n- ALWAYS respond/normalize in the language the user dictated (e.g. if dictated in Portuguese, output in Portuguese. Do NOT translate to English).'
+  );
 
-// 3. Replace startRecording
-const originalStartRecording = `function startRecording(kv, toast) {
+  // Replace startRecording
+  const originalStartRecording = `function startRecording(kv, toast) {
   if (soxProc) return;
 
   forceKillSox();
@@ -159,7 +172,7 @@ const originalStartRecording = `function startRecording(kv, toast) {
   recording = true;
 }`;
 
-const patchedStartRecording = `function startRecording(kv, toast) {
+  const patchedStartRecording = `function startRecording(kv, toast) {
   if (soxProc) return;
 
   forceKillSox();
@@ -231,24 +244,24 @@ const patchedStartRecording = `function startRecording(kv, toast) {
   recording = true;
 }`;
 
-content = content.replace(originalStartRecording, patchedStartRecording);
+  content = content.replace(originalStartRecording, patchedStartRecording);
 
-// 4. Replace stopRecording
-const originalStopRecording = `function stopRecording() {
+  // Replace stopRecording
+  const originalStopRecording = `function stopRecording() {
   if (soxProc) soxProc.kill("SIGINT");
 }`;
 
-const patchedStopRecording = `function stopRecording() {
+  const patchedStopRecording = `function stopRecording() {
   if (isSimulated) {
     return;
   }
   if (soxProc) soxProc.kill("SIGINT");
 }`;
 
-content = content.replace(originalStopRecording, patchedStopRecording);
+  content = content.replace(originalStopRecording, patchedStopRecording);
 
-// 5. Replace transcribe function to support -l <lang> for Portuguese / auto detection
-const originalTranscribe = `function transcribe(kv) {
+  // Replace transcribe function to support -l <lang> for Portuguese / auto detection
+  const originalTranscribe = `function transcribe(kv) {
   const mp = getModelPath(kv);
   if (!fs.existsSync(mp)) {
     return Promise.resolve({
@@ -303,7 +316,7 @@ const originalTranscribe = `function transcribe(kv) {
   });
 }`;
 
-const patchedTranscribe = `async function transcribe(kv, toast) {
+  const patchedTranscribe = `async function transcribe(kv, toast) {
   const mp = getModelPath(kv);
   if (!fs.existsSync(mp)) {
     const modelName = getModelName(kv);
@@ -365,10 +378,10 @@ const patchedTranscribe = `async function transcribe(kv, toast) {
   });
 }`;
 
-content = content.replace(originalTranscribe, patchedTranscribe);
+  content = content.replace(originalTranscribe, patchedTranscribe);
 
-// 6. Replace transcribeApi function to support API language specification
-const originalTranscribeApi = `async function transcribeApi(kv) {
+  // Replace transcribeApi function to support API language specification and direct API key fallback
+  const originalTranscribeApi = `async function transcribeApi(kv) {
   if (!sttApiEndpoint || !sttApiModel) {
     return { error: "STT API not configured" };
   }
@@ -426,7 +439,7 @@ const originalTranscribeApi = `async function transcribeApi(kv) {
   }
 }`;
 
-const patchedTranscribeApi = `async function transcribeApi(kv) {
+  const patchedTranscribeApi = `async function transcribeApi(kv) {
   if (!sttApiEndpoint || !sttApiModel) {
     return { error: "STT API not configured" };
   }
@@ -455,10 +468,8 @@ const patchedTranscribeApi = `async function transcribeApi(kv) {
       : \`\${sttApiEndpoint}/audio/transcriptions\`;
 
     const headers = {};
-    if (sttApiKeyEnv) {
-      const apiKey = process.env[sttApiKeyEnv];
-      if (apiKey) headers["Authorization"] = "Bearer " + apiKey;
-    }
+    const apiKey = (sttApiKeyEnv ? process.env[sttApiKeyEnv] : null) || sttApiKeyVal;
+    if (apiKey) headers["Authorization"] = "Bearer " + apiKey;
 
     const resp = await fetch(url, {
       method: "POST",
@@ -487,10 +498,26 @@ const patchedTranscribeApi = `async function transcribeApi(kv) {
   }
 }`;
 
-content = content.replace(originalTranscribeApi, patchedTranscribeApi);
+  content = content.replace(originalTranscribeApi, patchedTranscribeApi);
 
-// 7. Replace doTranscribePipeline
-const originalDoTranscribePipeline = `async function doTranscribePipeline(kv, complete, client, toast, systemPrompt, submit = false) {
+  // Set sttApiKeyVal when registerSTT is run
+  const originalRegisterBlock = `  if (opts?.sttEndpoint) {
+    sttApiEndpoint = opts.sttEndpoint;
+    sttApiModel = opts.sttModel || "whisper-large-v3-turbo";
+    sttApiKeyEnv = opts.sttApiKeyEnv || null;
+  }`;
+
+  const patchedRegisterBlock = `  if (opts?.sttEndpoint) {
+    sttApiEndpoint = opts.sttEndpoint;
+    sttApiModel = opts.sttModel || "whisper-large-v3-turbo";
+    sttApiKeyEnv = opts.sttApiKeyEnv || null;
+  }
+  sttApiKeyVal = opts?.apiKey || null;`;
+
+  content = content.replace(originalRegisterBlock, patchedRegisterBlock);
+
+  // Replace doTranscribePipeline
+  const originalDoTranscribePipeline = `async function doTranscribePipeline(kv, complete, client, toast, systemPrompt, submit = false) {
   processing = true;
   try {
     stopRecording();
@@ -533,7 +560,7 @@ const originalDoTranscribePipeline = `async function doTranscribePipeline(kv, co
   }
 }`;
 
-const patchedDoTranscribePipeline = `async function doTranscribePipeline(kv, complete, client, toast, systemPrompt, submit = false) {
+  const patchedDoTranscribePipeline = `async function doTranscribePipeline(kv, complete, client, toast, systemPrompt, submit = false) {
   processing = true;
   try {
     stopRecording();
@@ -590,8 +617,9 @@ const patchedDoTranscribePipeline = `async function doTranscribePipeline(kv, com
   }
 }`;
 
-content = content.replace(originalDoTranscribePipeline, patchedDoTranscribePipeline);
+  content = content.replace(originalDoTranscribePipeline, patchedDoTranscribePipeline);
 
-// Write patched content
-fs.writeFileSync(sttFile, content, 'utf8');
-console.log('[PATCH] stt.js successfully patched with language configuration and simulation.');
+  return content;
+});
+
+console.log('[PATCH] stt.js successfully patched with simulated recording, language config, and apiKey fallback.');
