@@ -477,8 +477,11 @@ function Update-OpenCodeConfig {
     # Ler config existente e corrigir caminhos MCP
     try {
         $raw = Get-Content $configFile -Raw -Encoding UTF8
-        # Remover comentarios JSONC (linhas // e blocos /* */)
-        $jsonClean = $raw -replace '//.*', '' -replace '/\*[\s\S]*?\*/', ''
+        # Remover comentarios JSONC de forma segura sem corromper URLs (http:// ou https://)
+        $jsonClean = [regex]::Replace($raw, '(?m)"(?:[^"\\]|\\.)*"|//.*|/\*[\s\S]*?\*/', {
+            param($m)
+            if ($m.Value.StartsWith("/")) { "" } else { $m.Value }
+        })
         $cfg = $jsonClean | ConvertFrom-Json
 
         $changed = $false
