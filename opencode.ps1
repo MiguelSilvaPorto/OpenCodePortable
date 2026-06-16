@@ -361,59 +361,13 @@ function Run-InitialSetup {
     $projectMcpScriptPath = Join-Path $OPENCODE_HOME "scripts\project_generator.py"
     $projectMcpScriptPathJson = $projectMcpScriptPath -replace '\\', '/'
 
-    $endpoint = "http://localhost:11434/v1"
-    $model = "llama3.2"
-    $apiKey = $null
-
-    if ($env:GROQ_API_KEY) {
-        $endpoint = "https://api.groq.com/openai/v1"
-        $model = "llama3-8b-8192"
-        $apiKey = $env:GROQ_API_KEY
-        Write-Log "SETUP" "GROQ_DETECTED" @{ model = $model }
+    Write-Log "SETUP" "CONFIG_WRITE" @{ file = $configFile }
+    $updateScript = Join-Path $OPENCODE_HOME "scripts\update_config.js"
+    if (Test-Path $updateScript) {
+        node $updateScript $OPENCODE_HOME
     } else {
-        Write-Log "SETUP" "OLLAMA_FALLBACK" @{ model = $model }
+        Write-Error "[CONFIG] update_config.js nao encontrado"
     }
-
-    $voiceConfig = [ordered]@{
-        "endpoint" = $endpoint
-        "model" = $model
-    }
-    if ($env:GROQ_API_KEY) {
-        $voiceConfig.Add("apiKeyEnv", "GROQ_API_KEY")
-        $voiceConfig.Add("sttEndpoint", "https://api.groq.com/openai/v1")
-        $voiceConfig.Add("sttModel", "whisper-large-v3-turbo")
-        $voiceConfig.Add("sttApiKeyEnv", "GROQ_API_KEY")
-    }
-
-    Write-Log "SETUP" "CONFIG_WRITE" @{ file = $configFile; office_mcp_path = $mcpScriptPathJson; project_mcp_path = $projectMcpScriptPathJson }
-    
-    $configObj = [ordered]@{
-        "`$schema" = "https://opencode.ai/config.json"
-        "plugin" = @(
-            @(
-                "@renjfk/opencode-voice",
-                $voiceConfig
-            ),
-            "multitask",
-            "multitask-tui.tsx",
-            "workspace-tui.tsx",
-            "auto-switch-mode.ts"
-        )
-        "mcp" = [ordered]@{
-            "office-mcp" = [ordered]@{
-                "type" = "local"
-                "command" = @("python", $mcpScriptPathJson)
-                "enabled" = $true
-            }
-            "project-mcp" = [ordered]@{
-                "type" = "local"
-                "command" = @("python", $projectMcpScriptPathJson)
-                "enabled" = $true
-            }
-        }
-    }
-    
-    $configObj | ConvertTo-Json -Depth 10 | Set-Content -Path $configFile -Encoding UTF8
 
     # Criar marker
     New-Item -ItemType File -Path $FIRST_RUN_MARKER -Force | Out-Null
@@ -434,141 +388,14 @@ function Run-InitialSetup {
 
 function Update-OpenCodeConfig {
     $configFile = Join-Path $OPENCODE_CONFIG "opencode.jsonc"
-
-    $mcpScriptPath = (Join-Path $OPENCODE_HOME "scripts\office_mcp.py") -replace '\\', '/'
-    $projectMcpPath = (Join-Path $OPENCODE_HOME "scripts\project_generator.py") -replace '\\', '/'
-
-    if (-not (Test-Path $configFile)) {
-        Write-Log "CONFIG" "MISSING" @{ action = "WILL_CREATE" } "WARN"
-        # Criar config padrao completo
-        $endpoint = "http://localhost:11434/v1"
-        $model = "llama3.2"
-        if ($env:GROQ_API_KEY) {
-            $endpoint = "https://api.groq.com/openai/v1"
-            $model = "llama3-8b-8192"
-        }
-        $voiceCfg = [ordered]@{ endpoint = $endpoint; model = $model }
-        if ($env:GROQ_API_KEY) { 
-            $voiceCfg.Add("apiKeyEnv", "GROQ_API_KEY")
-            $voiceCfg.Add("sttEndpoint", "https://api.groq.com/openai/v1")
-            $voiceCfg.Add("sttModel", "whisper-large-v3-turbo")
-            $voiceCfg.Add("sttApiKeyEnv", "GROQ_API_KEY")
-        }
-
-        $configObj = [ordered]@{
-            "`$schema" = "https://opencode.ai/config.json"
-            plugin = @(
-                @("@renjfk/opencode-voice", $voiceCfg),
-                "multitask",
-                "multitask-tui.tsx",
-                "workspace-tui.tsx",
-                "auto-switch-mode.ts"
-            )
-            mcp = [ordered]@{
-                "office-mcp" = [ordered]@{ type = "local"; command = @("python", $mcpScriptPath); enabled = $true }
-                "project-mcp" = [ordered]@{ type = "local"; command = @("python", $projectMcpPath); enabled = $true }
-            }
-        }
-        $configObj | ConvertTo-Json -Depth 10 | Set-Content -Path $configFile -Encoding UTF8
-        Write-Log "CONFIG" "CREATED" @{ office_mcp = $mcpScriptPath; project_mcp = $projectMcpPath }
-        return
-    }
-
-    # Ler config existente e corrigir caminhos MCP
-    try {
-        $raw = Get-Content $configFile -Raw -Encoding UTF8
-        # Remover comentarios JSONC de forma segura sem corromper URLs (http:// ou https://)
-        $jsonClean = [regex]::Replace($raw, '(?m)"(?:[^"\\]|\\.)*"|//.*|/\*[\s\S]*?\*/', {
-            param($m)
-            if ($m.Value.StartsWith("/")) { "" } else { $m.Value }
-        })
-        $cfg = $jsonClean | ConvertFrom-Json
-
-        $changed = $false
-
-        # Corrigir office-mcp
-        if ($cfg.mcp.'office-mcp') {
-            $currentCmd = $cfg.mcp.'office-mcp'.command
-            if ($currentCmd -is [System.Array] -and $currentCmd.Count -ge 2) {
-                if ($currentCmd[1] -ne $mcpScriptPath) {
-                    Write-Log "CONFIG" "PATH_FIX" @{ server = "office-mcp"; old = $currentCmd[1]; new = $mcpScriptPath } "WARN"
-                    $cfg.mcp.'office-mcp'.command = @("python", $mcpScriptPath)
-                    $changed = $true
-                }
-            }
-        } else {
-            Write-Log "CONFIG" "MCP_MISSING" @{ server = "office-mcp"; action = "ADDING" } "WARN"
-            $cfg.mcp | Add-Member -NotePropertyName 'office-mcp' -NotePropertyValue ([PSCustomObject]@{ type = "local"; command = @("python", $mcpScriptPath); enabled = $true }) -Force
-            $changed = $true
-        }
-
-        # Corrigir project-mcp
-        if ($cfg.mcp.'project-mcp') {
-            $currentCmd = $cfg.mcp.'project-mcp'.command
-            if ($currentCmd -is [System.Array] -and $currentCmd.Count -ge 2) {
-                if ($currentCmd[1] -ne $projectMcpPath) {
-                    Write-Log "CONFIG" "PATH_FIX" @{ server = "project-mcp"; old = $currentCmd[1]; new = $projectMcpPath } "WARN"
-                    $cfg.mcp.'project-mcp'.command = @("python", $projectMcpPath)
-                    $changed = $true
-                }
-            }
-        } else {
-            Write-Log "CONFIG" "MCP_MISSING" @{ server = "project-mcp"; action = "ADDING" } "WARN"
-            $cfg.mcp | Add-Member -NotePropertyName 'project-mcp' -NotePropertyValue ([PSCustomObject]@{ type = "local"; command = @("python", $projectMcpPath); enabled = $true }) -Force
-            $changed = $true
-        }
-        # Corrigir voice plugin se GROQ_API_KEY estiver disponivel
-        if ($env:GROQ_API_KEY -and $cfg.plugin) {
-            foreach ($p in $cfg.plugin) {
-                if ($p -is [System.Array] -and $p.Count -ge 2 -and $p[0] -eq "@renjfk/opencode-voice") {
-                    $voiceCfgObj = $p[1]
-                    if (-not $voiceCfgObj.sttEndpoint -or -not $voiceCfgObj.apiKeyEnv) {
-                        Write-Log "CONFIG" "VOICE_MIGRATE" @{ provider = "groq" } "WARN"
-                        $voiceCfgObj | Add-Member -NotePropertyName 'apiKeyEnv' -NotePropertyValue "GROQ_API_KEY" -Force
-                        $voiceCfgObj | Add-Member -NotePropertyName 'sttEndpoint' -NotePropertyValue "https://api.groq.com/openai/v1" -Force
-                        $voiceCfgObj | Add-Member -NotePropertyName 'sttModel' -NotePropertyValue "whisper-large-v3-turbo" -Force
-                        $voiceCfgObj | Add-Member -NotePropertyName 'sttApiKeyEnv' -NotePropertyValue "GROQ_API_KEY" -Force
-                        $changed = $true
-                    }
-                }
-            }
-        }
-
-        if ($changed) {
-            $cfg | ConvertTo-Json -Depth 10 | Set-Content -Path $configFile -Encoding UTF8
-            Write-Log "CONFIG" "UPDATED" @{ office_mcp = $mcpScriptPath; project_mcp = $projectMcpPath }
-        } else {
-            Write-Log "CONFIG" "OK" @{ office_mcp = $mcpScriptPath; project_mcp = $projectMcpPath }
-        }
-    }
-    catch {
-        Write-Log "CONFIG" "PARSE_ERROR" @{ error = $_.Exception.Message } "ERROR"
-        # Recriar config do zero se parse falhar
-        $endpoint = "http://localhost:11434/v1"
-        $model = "llama3.2"
-        if ($env:GROQ_API_KEY) {
-            $endpoint = "https://api.groq.com/openai/v1"
-            $model = "llama3-8b-8192"
-        }
-        $voiceCfg = [ordered]@{ endpoint = $endpoint; model = $model }
-        if ($env:GROQ_API_KEY) { $voiceCfg.Add("apiKey", $env:GROQ_API_KEY) }
-
-        $configObj = [ordered]@{
-            "`$schema" = "https://opencode.ai/config.json"
-            plugin = @(
-                @("@renjfk/opencode-voice", $voiceCfg),
-                "multitask",
-                "multitask-tui.tsx",
-                "workspace-tui.tsx",
-                "auto-switch-mode.ts"
-            )
-            mcp = [ordered]@{
-                "office-mcp" = [ordered]@{ type = "local"; command = @("python", $mcpScriptPath); enabled = $true }
-                "project-mcp" = [ordered]@{ type = "local"; command = @("python", $projectMcpPath); enabled = $true }
-            }
-        }
-        $configObj | ConvertTo-Json -Depth 10 | Set-Content -Path $configFile -Encoding UTF8
-        Write-Log "CONFIG" "RECREATED" @{ reason = "PARSE_FAILURE"; office_mcp = $mcpScriptPath; project_mcp = $projectMcpPath } "WARN"
+    
+    # Executar a atualização da configuração via Node.js de forma robusta e livre de bugs do PowerShell
+    $updateScript = Join-Path $OPENCODE_HOME "scripts\update_config.js"
+    if (Test-Path $updateScript) {
+        node $updateScript $OPENCODE_HOME
+        Write-Log "CONFIG" "UPDATED" @{ file = $configFile }
+    } else {
+        Write-Error "[CONFIG] update_config.js nao encontrado"
     }
 }
 
