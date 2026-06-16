@@ -2,6 +2,15 @@
 $cacheDir = Join-Path $env:USERPROFILE ".cache\opencode\packages\@renjfk\opencode-voice@latest"
 $sttFile = Join-Path $cacheDir "node_modules\@renjfk\opencode-voice\lib\stt.js"
 
+# Se o backup ou o stt.js atual contiver o erro antigo (DialogInput), limpamos tudo para forçar reinstalação limpa
+if (Test-Path $sttFile) {
+    $content = Get-Content $sttFile -Raw
+    if ($content -match "DialogInput") {
+        Write-Host "[HEALTH] Detectado patch antigo com DialogInput. Limpando cache para reinstalar..." -ForegroundColor Yellow
+        Remove-Item (Join-Path $cacheDir "node_modules") -Recurse -Force -ErrorAction SilentlyContinue
+    }
+}
+
 # Se o cache ou stt.js estiver ausente, criamos e instalamos previamente para o patch rodar sempre
 if (-not (Test-Path $sttFile)) {
     Write-Host "[HEALTH] Pre-instalando dependencias do plugin de voz..." -ForegroundColor Yellow
