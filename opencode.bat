@@ -576,8 +576,8 @@ if exist "%STT_FILE%" (
     )
     findstr /c:"recording failed, retrying with default device" "%STT_FILE%" >nul 2>&1
     if errorlevel 1 (
-        echo [HEALTH] Aplicando fallback do driver de audio SoX ( waveaudio -^> default )...
-        powershell -NoProfile -Command "$f=Join-Path $env:USERPROFILE '.cache\opencode\packages\@renjfk\opencode-voice@latest\node_modules\@renjfk\opencode-voice\lib\stt.js'; $c=Get-Content $f -Raw; $target = '  soxProc = spawn\(\r?\n    \"sox\",\r?\n    \[\"--buffer\", \"2048\", ...inputArgs, \"-r\", \"16000\", \"-c\", \"1\", \"-b\", \"16\", WAV_FILE\],'; $replace = '  // Fallback se waveaudio falhar\r\n  let isFallback = false;\r\n  if (process.platform === \"win32\" && inputArgs[1] === \"waveaudio\" && inputArgs[2] === \"default\") {\r\n    // Se der erro de default audio device, tentamos rodar o SoX sem waveaudio (so com -d)\r\n  }\r\n  soxProc = spawn(\r\n    \"sox\",\r\n    [\"--buffer\", \"2048\", ...inputArgs, \"-r\", \"16000\", \"-c\", \"1\", \"-b\", \"16\", WAV_FILE\],'; $c = $c -replace $target, $replace; $c = $c.Replace('toast(`Recording error: ${errLine || `sox exited (code=${code})`}`, \"error\");', 'if (!isFallback && errLine && errLine.includes(\"no default audio device\")) {\r\n        isFallback = true;\r\n        console.log(\"[stt] waveaudio default failed, retrying with default device -d...\");\r\n        inputArgs = [\"-d\"];\r\n        startRecording(kv, toast, client);\r\n      } else {\r\n        toast(`Recording error: ${errLine || `sox exited (code=${code})`}`, \"error\");\r\n      }'); Set-Content $f $c -NoNewline -Encoding UTF8"
+        echo [HEALTH] Aplicando fallback do driver de audio SoX...
+        powershell -NoProfile -ExecutionPolicy Bypass -File "%OPENCODE_HOME%scripts\patch_stt.ps1"
         echo [HEALTH] OK: Fallback do SoX aplicado com sucesso!
     )
 )
