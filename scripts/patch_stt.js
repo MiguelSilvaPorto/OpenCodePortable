@@ -93,7 +93,7 @@ patchFile(sttFile, (content) => {
     'const WAV_FILE = path.join(os.tmpdir(), "opencode-stt.wav");'
   );
 
-  // Define global variables, writeSilentWav, downloadModel helpers and sttApiKeyVal
+  // Define global variables, writeSilentWav, downloadModel, getClipboardText helpers and sttApiKeyVal
   const helperCode = `
 let isSimulated = false;
 let sttApiKeyVal = null;
@@ -158,6 +158,20 @@ function downloadModel(modelFile, destPath, toast) {
     }
     getUrl(url);
   });
+}
+
+function getClipboardText() {
+  try {
+    if (process.platform === "win32") {
+      return execSync("powershell -NoProfile -Command Get-Clipboard", { encoding: "utf-8", timeout: 2000 }).trim();
+    } else if (process.platform === "darwin") {
+      return execSync("pbpaste", { encoding: "utf-8", timeout: 2000 }).trim();
+    } else {
+      return execSync("xclip -selection clipboard -o", { encoding: "utf-8", timeout: 2000 }).trim();
+    }
+  } catch {
+    return "";
+  }
 }
 `;
 
@@ -430,7 +444,7 @@ function downloadModel(modelFile, destPath, toast) {
   content = content.replace(originalTranscribe, patchedTranscribe);
 
   // Replace transcribeApi function to support API language specification and dynamic configs from KV
-  const originalTranscribeApi = `async function transcribeApi(kv) {
+  const originalTranslateApi = `async function transcribeApi(kv) {
   if (!sttApiEndpoint || !sttApiModel) {
     return { error: "STT API not configured" };
   }
@@ -551,9 +565,9 @@ function downloadModel(modelFile, destPath, toast) {
   }
 }`;
 
-  content = content.replace(originalTranscribeApi, patchedTranscribeApi);
+  content = content.replace(originalTranslateApi, patchedTranscribeApi);
 
-  // Set sttApiKeyVal when registerSTT is run and update dynamic sttApiEndpoint resolve in pipeline
+  // Set sttApiKeyVal when registerSTT is run
   const originalRegisterBlock = `  if (opts?.sttEndpoint) {
     sttApiEndpoint = opts.sttEndpoint;
     sttApiModel = opts.sttModel || "whisper-large-v3-turbo";
@@ -768,15 +782,17 @@ function downloadModel(modelFile, destPath, toast) {
                   }
                 },
                 {
-                  title: "3. Importar Groq API Key da variável de ambiente",
-                  value: "voice.import_key",
+                  title: "3. Colar Groq API Key da Área de Transferência (Clipboard)",
+                  value: "voice.paste_key",
                   onSelect() {
-                    const envKey = process.env.GROQ_API_KEY || "";
-                    if (envKey) {
-                      kv.set("stt.apiKey", envKey);
-                      toast("Chave de API do Groq importada com sucesso!", "success");
+                    const clipboardKey = getClipboardText();
+                    if (clipboardKey && clipboardKey.startsWith("gsk_")) {
+                      kv.set("stt.apiKey", clipboardKey);
+                      toast("Chave de API do Groq colada com sucesso!", "success");
+                    } else if (clipboardKey) {
+                      toast("Erro: Conteúdo da área de transferência não começa com 'gsk_'", "error");
                     } else {
-                      toast("Variável GROQ_API_KEY não encontrada no ambiente", "error");
+                      toast("Área de transferência vazia", "warning");
                     }
                     showMainMenu();
                   }
@@ -884,4 +900,4 @@ function downloadModel(modelFile, destPath, toast) {
   return content;
 });
 
-console.log('[PATCH] stt.js successfully patched with language configuration, simulation, and /voice menu command.');
+console.log('[PATCH] stt.js successfully patched with simulated recording, language config, clipboard integration, and /voice menu.');
