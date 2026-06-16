@@ -23,13 +23,16 @@ let content = fs.readFileSync(sttFile, 'utf8');
 // Normalize line endings to LF to ensure match patterns succeed reliably
 content = content.replace(/\r\n/g, '\n');
 
+// 0. Import https module at the top
+content = 'import https from "node:https";\n' + content;
+
 // 1. Update WAV_FILE path
 content = content.replace(
   'const WAV_FILE = "/tmp/opencode-stt.wav";',
   'const WAV_FILE = path.join(os.tmpdir(), "opencode-stt.wav");'
 );
 
-// 2. Define global variables and writeSilentWav helper
+// 2. Define global variables and writeSilentWav helper + downloadModel helper
 const helperCode = `
 let isSimulated = false;
 
@@ -63,9 +66,46 @@ function writeSilentWav(filePath) {
     console.error("Failed to write silent WAV:", err);
   }
 }
+
+function downloadModel(modelFile, destPath, toast) {
+  const url = \`https://huggingface.co/ggerganov/whisper.cpp/resolve/main/\${modelFile}\`;
+  toast(\`Downloading Whisper model (\${modelFile})... please wait\`, "info");
+  
+  fs.mkdirSync(path.dirname(destPath), { recursive: true });
+  const file = fs.createWriteStream(destPath);
+  
+  return new Promise((resolve, reject) => {
+    function getUrl(targetUrl) {
+      https.get(targetUrl, { headers: { "User-Agent": "Mozilla/5.0" } }, (response) => {
+        if (response.statusCode === 302 || response.statusCode === 301) {
+          getUrl(response.headers.location);
+        } else if (response.statusCode !== 200) {
+          fs.unlink(destPath, () => {});
+          reject(new Error(\`HTTP status \${response.statusCode}\`));
+        } else {
+          response.pipe(file);
+          file.on('finish', () => {
+            file.close();
+            resolve();
+          });
+        }
+      }).on('error', (err) => {
+        fs.unlink(destPath, () => {});
+        reject(err);
+      });
+    }
+    getUrl(url);
+  });
+}
 `;
 
 content = content.replace('let soxProc = null;', 'let soxProc = null;\n' + helperCode);
+
+// Change default model to "base"
+content = content.replace(
+  'const DEFAULT_MODEL = "large-v3-turbo-q5_0";',
+  'const DEFAULT_MODEL = "base";'
+);
 
 // 3. Replace startRecording
 const originalStartRecording = `function startRecording(kv, toast) {
@@ -201,7 +241,125 @@ const patchedStopRecording = `function stopRecording() {
 
 content = content.replace(originalStopRecording, patchedStopRecording);
 
-// 5. Replace doTranscribePipeline
+// 5. Replace transcribe function with downloader logic
+const originalTranscribe = `function transcribe(kv) {
+  const mp = getModelPath(kv);
+  if (!fs.existsSync(mp)) {
+    return Promise.resolve({
+      error: \`Model not found: \${getModelName(kv)}. Download from huggingface.co/ggerganov/whisper.cpp\`,
+    });
+  }
+  if (!fs.existsSync(WAV_FILE)) {
+    return Promise.resolve({ error: "No recording file - sox may have failed to capture audio" });
+  }
+  if (fs.statSync(WAV_FILE).size <= 44) {
+    return Promise.resolve({ error: "Recording is empty - no audio captured" });
+  }
+
+  return new Promise((resolve) => {
+    let stdout = "";
+    let stderr = "";
+    const proc = spawn("whisper-cli", ["-m", mp, "-f", WAV_FILE, "-np", "-nt"], {
+      stdio: ["ignore", "pipe", "pipe"],
+    });
+
+    proc.stdout.on("data", (chunk) => {
+      stdout += chunk.toString();
+    });
+    proc.stderr.on("data", (chunk) => {
+      stderr += chunk.toString();
+    });
+
+    const timer = setTimeout(() => {
+      proc.kill("SIGKILL");
+      resolve({ error: "Transcription timed out (60s)" });
+    }, 60000);
+
+    proc.on("error", (err) => {
+      clearTimeout(timer);
+      resolve({ error: \`Transcription failed: \${err.message}\` });
+    });
+
+    proc.on("exit", (code) => {
+      clearTimeout(timer);
+      if (code !== 0) {
+        resolve({ error: stderr.trim().split("\\n").pop() || \`whisper-cli exited (code=\${code})\` });
+        return;
+      }
+      resolve({
+        text: stdout
+          .replace(/\\[.*?\\]/g, "")
+          .replace(/\\(.*?\\)/g, "")
+          .replace(/\\s+/g, " ")
+          .trim(),
+      });
+    });
+  });
+}`;
+
+const patchedTranscribe = `async function transcribe(kv, toast) {
+  const mp = getModelPath(kv);
+  if (!fs.existsSync(mp)) {
+    const modelName = getModelName(kv);
+    const modelFile = MODELS[modelName].file;
+    try {
+      await downloadModel(modelFile, mp, toast);
+      toast(\`Whisper model \${modelName} downloaded successfully!\`, "success");
+    } catch (err) {
+      return { error: \`Whisper model \${modelName} not found, and auto-download failed: \${err.message}\` };
+    }
+  }
+  if (!fs.existsSync(WAV_FILE)) {
+    return { error: "No recording file - sox may have failed to capture audio" };
+  }
+  if (fs.statSync(WAV_FILE).size <= 44) {
+    return { error: "Recording is empty - no audio captured" };
+  }
+
+  return new Promise((resolve) => {
+    let stdout = "";
+    let stderr = "";
+    const proc = spawn("whisper-cli", ["-m", mp, "-f", WAV_FILE, "-np", "-nt"], {
+      stdio: ["ignore", "pipe", "pipe"],
+    });
+
+    proc.stdout.on("data", (chunk) => {
+      stdout += chunk.toString();
+    });
+    proc.stderr.on("data", (chunk) => {
+      stderr += chunk.toString();
+    });
+
+    const timer = setTimeout(() => {
+      proc.kill("SIGKILL");
+      resolve({ error: "Transcription timed out (60s)" });
+    }, 60000);
+
+    proc.on("error", (err) => {
+      clearTimeout(timer);
+      resolve({ error: \`Transcription failed: \${err.message}\` });
+    });
+
+    proc.on("exit", (code) => {
+      clearTimeout(timer);
+      if (code !== 0) {
+        resolve({ error: stderr.trim().split("\\n").pop() || \`whisper-cli exited (code=\${code})\` });
+        return;
+      }
+      resolve({
+        text: stdout
+          .replace(/\\[.*?\\\]/g, "")
+          .replace(/\\(.*?\\)/g, "")
+          .replace(/\\s+/g, " ")
+          .trim(),
+      });
+    });
+  });
+}`;
+
+content = content.replace(originalTranscribe, patchedTranscribe);
+
+// 6. Replace doTranscribePipeline
 const originalDoTranscribePipeline = `async function doTranscribePipeline(kv, complete, client, toast, systemPrompt, submit = false) {
   processing = true;
   try {
@@ -257,7 +415,7 @@ const patchedDoTranscribePipeline = `async function doTranscribePipeline(kv, com
       writeSilentWav(WAV_FILE);
     }
 
-    const result = sttApiEndpoint ? await transcribeApi(kv) : await transcribe(kv);
+    const result = sttApiEndpoint ? await transcribeApi(kv) : await transcribe(kv, toast);
 
     if (result.error) {
       if (isSimulated) {
@@ -306,4 +464,4 @@ content = content.replace(originalDoTranscribePipeline, patchedDoTranscribePipel
 
 // Write patched content
 fs.writeFileSync(sttFile, content, 'utf8');
-console.log('[PATCH] stt.js successfully patched with simulated recording support.');
+console.log('[PATCH] stt.js successfully patched with simulated recording and auto-downloader.');
