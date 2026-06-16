@@ -416,13 +416,6 @@ function Run-InitialSetup {
     New-Item -ItemType File -Path $FIRST_RUN_MARKER -Force | Out-Null
     Write-Log "SETUP" "COMPLETED" @{ marker = $FIRST_RUN_MARKER }
 
-    # 10. Corrigir filtro de dispositivos de audio no voice plugin (portabilidade)
-    $patchScript = Join-Path $OPENCODE_HOME "scripts\patch_stt.ps1"
-    if (Test-Path $patchScript) {
-        Write-Log "SETUP" "PATCHING_STT" @{ script = $patchScript }
-        & $patchScript
-    }
-
     Write-Host ""
     Write-Host "============================================" -ForegroundColor Green
     Write-Host "  Configuracao Inicial Concluida!" -ForegroundColor Green
@@ -894,6 +887,13 @@ if ($Arguments.Count -gt 0) {
 }
 
 $projectPath = Select-Project -ProvidedPath $providedPath
+
+# 3.5. Garantir patches de portabilidade e fallback no voice plugin (roda sempre antes de abrir)
+$patchScript = Join-Path $OPENCODE_HOME "scripts\patch_stt.ps1"
+if (Test-Path $patchScript) {
+    Write-Log "LAUNCH" "PATCHING_STT" @{ script = $patchScript }
+    & $patchScript
+}
 
 # 4. Executar OpenCode
 Invoke-OpenCode -ProjectPath $projectPath
