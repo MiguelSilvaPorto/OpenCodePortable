@@ -107,6 +107,12 @@ content = content.replace(
   'const DEFAULT_MODEL = "base";'
 );
 
+// Add rule to preserve language to system prompt
+content = content.replace(
+  '- Keep the user\'s intent and meaning intact',
+  '- Keep the user\'s intent and meaning intact\n- ALWAYS respond/normalize in the language the user dictated (e.g. if dictated in Portuguese, output in Portuguese. Do NOT translate to English).'
+);
+
 // 3. Replace startRecording
 const originalStartRecording = `function startRecording(kv, toast) {
   if (soxProc) return;
@@ -241,7 +247,7 @@ const patchedStopRecording = `function stopRecording() {
 
 content = content.replace(originalStopRecording, patchedStopRecording);
 
-// 5. Replace transcribe function with downloader logic
+// 5. Replace transcribe function to support -l <lang> for Portuguese / auto detection
 const originalTranscribe = `function transcribe(kv) {
   const mp = getModelPath(kv);
   if (!fs.existsSync(mp)) {
@@ -316,10 +322,12 @@ const patchedTranscribe = `async function transcribe(kv, toast) {
     return { error: "Recording is empty - no audio captured" };
   }
 
+  const lang = kv.get("stt.language", "pt");
+
   return new Promise((resolve) => {
     let stdout = "";
     let stderr = "";
-    const proc = spawn("whisper-cli", ["-m", mp, "-f", WAV_FILE, "-np", "-nt"], {
+    const proc = spawn("whisper-cli", ["-m", mp, "-f", WAV_FILE, "-np", "-nt", "-l", lang], {
       stdio: ["ignore", "pipe", "pipe"],
     });
 
@@ -359,7 +367,129 @@ const patchedTranscribe = `async function transcribe(kv, toast) {
 
 content = content.replace(originalTranscribe, patchedTranscribe);
 
-// 6. Replace doTranscribePipeline
+// 6. Replace transcribeApi function to support API language specification
+const originalTranscribeApi = `async function transcribeApi(kv) {
+  if (!sttApiEndpoint || !sttApiModel) {
+    return { error: "STT API not configured" };
+  }
+  const model = kv.get("stt.api.model") || sttApiModel;
+
+  if (!fs.existsSync(WAV_FILE)) {
+    return { error: "No recording file - sox may have failed to capture audio" };
+  }
+  if (fs.statSync(WAV_FILE).size <= 44) {
+    return { error: "Recording is empty - no audio captured" };
+  }
+
+  try {
+    const audioBuffer = await fs.promises.readFile(WAV_FILE);
+    const blob = new Blob([audioBuffer], { type: "audio/wav" });
+    const form = new FormData();
+    form.append("file", blob, "audio.wav");
+    form.append("model", model);
+    form.append("response_format", "json");
+
+    const url = sttApiEndpoint.endsWith("/")
+      ? \`\${sttApiEndpoint}audio/transcriptions\`
+      : \`\${sttApiEndpoint}/audio/transcriptions\`;
+
+    const headers = {};
+    if (sttApiKeyEnv) {
+      const apiKey = process.env[sttApiKeyEnv];
+      if (apiKey) headers["Authorization"] = "Bearer " + apiKey;
+    }
+
+    const resp = await fetch(url, {
+      method: "POST",
+      headers,
+      body: form,
+      signal: AbortSignal.timeout(60000),
+    });
+
+    if (!resp.ok) {
+      const body = await resp.text();
+      let msg = \`STT API error \${resp.status}\`;
+      try {
+        const err = JSON.parse(body);
+        msg = err?.error?.message || msg;
+      } catch {}
+      return { error: msg };
+    }
+
+    const data = await resp.json();
+    return { text: data.text?.trim() || "" };
+  } catch (err) {
+    if (err.name === "TimeoutError" || err.name === "AbortError") {
+      return { error: "STT API request timed out (60s)" };
+    }
+    return { error: \`STT API request failed: \${err.message}\` };
+  }
+}`;
+
+const patchedTranscribeApi = `async function transcribeApi(kv) {
+  if (!sttApiEndpoint || !sttApiModel) {
+    return { error: "STT API not configured" };
+  }
+  const model = kv.get("stt.api.model") || sttApiModel;
+
+  if (!fs.existsSync(WAV_FILE)) {
+    return { error: "No recording file - sox may have failed to capture audio" };
+  }
+  if (fs.statSync(WAV_FILE).size <= 44) {
+    return { error: "Recording is empty - no audio captured" };
+  }
+
+  try {
+    const audioBuffer = await fs.promises.readFile(WAV_FILE);
+    const blob = new Blob([audioBuffer], { type: "audio/wav" });
+    const form = new FormData();
+    form.append("file", blob, "audio.wav");
+    form.append("model", model);
+    form.append("response_format", "json");
+    
+    const lang = kv.get("stt.language", "pt");
+    form.append("language", lang);
+
+    const url = sttApiEndpoint.endsWith("/")
+      ? \`\${sttApiEndpoint}audio/transcriptions\`
+      : \`\${sttApiEndpoint}/audio/transcriptions\`;
+
+    const headers = {};
+    if (sttApiKeyEnv) {
+      const apiKey = process.env[sttApiKeyEnv];
+      if (apiKey) headers["Authorization"] = "Bearer " + apiKey;
+    }
+
+    const resp = await fetch(url, {
+      method: "POST",
+      headers,
+      body: form,
+      signal: AbortSignal.timeout(60000),
+    });
+
+    if (!resp.ok) {
+      const body = await resp.text();
+      let msg = \`STT API error \${resp.status}\`;
+      try {
+        const err = JSON.parse(body);
+        msg = err?.error?.message || msg;
+      } catch {}
+      return { error: msg };
+    }
+
+    const data = await resp.json();
+    return { text: data.text?.trim() || "" };
+  } catch (err) {
+    if (err.name === "TimeoutError" || err.name === "AbortError") {
+      return { error: "STT API request timed out (60s)" };
+    }
+    return { error: \`STT API request failed: \${err.message}\` };
+  }
+}`;
+
+content = content.replace(originalTranscribeApi, patchedTranscribeApi);
+
+// 7. Replace doTranscribePipeline
 const originalDoTranscribePipeline = `async function doTranscribePipeline(kv, complete, client, toast, systemPrompt, submit = false) {
   processing = true;
   try {
@@ -464,4 +594,4 @@ content = content.replace(originalDoTranscribePipeline, patchedDoTranscribePipel
 
 // Write patched content
 fs.writeFileSync(sttFile, content, 'utf8');
-console.log('[PATCH] stt.js successfully patched with simulated recording and auto-downloader.');
+console.log('[PATCH] stt.js successfully patched with language configuration and simulation.');
