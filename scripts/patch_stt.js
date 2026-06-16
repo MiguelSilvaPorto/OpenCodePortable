@@ -163,13 +163,15 @@ function downloadModel(modelFile, destPath, toast) {
 
 function getClipboardText() {
   try {
+    let text = "";
     if (process.platform === "win32") {
-      return execSync("powershell -NoProfile -Command Get-Clipboard", { encoding: "utf-8", timeout: 2000 }).trim();
+      text = execSync("powershell -NoProfile -Command Get-Clipboard", { encoding: "utf-8", timeout: 2000 });
     } else if (process.platform === "darwin") {
-      return execSync("pbpaste", { encoding: "utf-8", timeout: 2000 }).trim();
+      text = execSync("pbpaste", { encoding: "utf-8", timeout: 2000 });
     } else {
-      return execSync("xclip -selection clipboard -o", { encoding: "utf-8", timeout: 2000 }).trim();
+      text = execSync("xclip -selection clipboard -o", { encoding: "utf-8", timeout: 2000 });
     }
+    return (text || "").trim().replace(/[^a-zA-Z0-9_-]/g, "");
   } catch {
     return "";
   }
@@ -758,6 +760,7 @@ function getClipboardText() {
                               const envKey = process.env.GROQ_API_KEY || "";
                               if (envKey) {
                                 kv.set("stt.apiKey", envKey);
+                                sttApiKeyVal = envKey;
                               }
                               toast("Provedor alterado para Groq Cloud");
                               showMainMenu();
