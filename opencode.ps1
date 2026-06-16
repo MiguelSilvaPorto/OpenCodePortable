@@ -515,6 +515,7 @@ function Update-OpenCodeConfig {
             Write-Log "CONFIG" "MCP_MISSING" @{ server = "project-mcp"; action = "ADDING" } "WARN"
             $cfg.mcp | Add-Member -NotePropertyName 'project-mcp' -NotePropertyValue ([PSCustomObject]@{ type = "local"; command = @("python", $projectMcpPath); enabled = $true }) -Force
             $changed = $true
+        }
         # Corrigir voice plugin se GROQ_API_KEY estiver disponivel
         if ($env:GROQ_API_KEY -and $cfg.plugin) {
             foreach ($p in $cfg.plugin) {
