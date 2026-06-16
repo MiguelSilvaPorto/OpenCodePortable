@@ -1,5 +1,16 @@
 # Helper script para patchear stt.js com segurança e garantir gravação universal
-$sttFile = Join-Path $env:USERPROFILE ".cache\opencode\packages\@renjfk\opencode-voice@latest\node_modules\@renjfk\opencode-voice\lib\stt.js"
+$cacheDir = Join-Path $env:USERPROFILE ".cache\opencode\packages\@renjfk\opencode-voice@latest"
+$sttFile = Join-Path $cacheDir "node_modules\@renjfk\opencode-voice\lib\stt.js"
+
+# Sistema inteligente de limpeza automática de cache se o arquivo estiver em estado inconsistente
+if (Test-Path $sttFile) {
+    $rawContent = [System.IO.File]::ReadAllText($sttFile, [System.Text.Encoding]::UTF8)
+    # Se o arquivo já tiver modificações mas não possuir nossa assinatura nova, limpa o cache para recriar
+    if ($rawContent -match 'isFallback' -and $rawContent -notmatch 'recording failed, retrying with default device' -and $rawContent -notmatch 'retrying recording with universal fallback') {
+        Write-Host "[HEALTH] Cache do voice-plugin desatualizado. Limpando..." -ForegroundColor Yellow
+        Remove-Item -Recurse -Force $cacheDir -ErrorAction SilentlyContinue
+    }
+}
 
 if (Test-Path $sttFile) {
     # Restaurar arquivo original para evitar patches acumulados incorretos
