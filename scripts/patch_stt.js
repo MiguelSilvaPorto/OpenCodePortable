@@ -733,6 +733,11 @@ function getClipboardText() {
     api.ui.toast({ message, variant, duration: 3000 });
   }
 
+  // Migrar modelo antigo/descontinuado no KV store se existir
+  if (kv && kv.get("stt.llmModel") === "llama3-8b-8192") {
+    kv.set("stt.llmModel", "llama-3.1-8b-instant");
+  }
+
   if (opts?.sttEndpoint) {
     sttApiEndpoint = opts.sttEndpoint;
     sttApiModel = opts.sttModel || "whisper-large-v3-turbo";
