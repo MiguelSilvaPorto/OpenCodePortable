@@ -3,6 +3,7 @@ const path = require('path');
 const os = require('os');
 
 const cacheDir = path.join(os.homedir(), '.cache', 'opencode', 'packages', '@renjfk', 'opencode-voice@latest');
+const indexFile = path.join(cacheDir, 'node_modules', '@renjfk', 'opencode-voice', 'index.js');
 const sttFile = path.join(cacheDir, 'node_modules', '@renjfk', 'opencode-voice', 'lib', 'stt.js');
 const llmClientFile = path.join(cacheDir, 'node_modules', '@renjfk', 'opencode-voice', 'lib', 'llm-client.js');
 
@@ -24,16 +25,64 @@ function patchFile(filePath, patchFn) {
   fs.writeFileSync(filePath, content, 'utf8');
 }
 
-// 1. Patch llm-client.js to support direct apiKey option fallback
-patchFile(llmClientFile, (content) => {
-  const originalKeyLine = 'const apiKey = cfg.apiKeyEnv ? process.env[cfg.apiKeyEnv] : null;';
-  const patchedKeyLine = 'const apiKey = (cfg.apiKeyEnv ? process.env[cfg.apiKeyEnv] : null) || pluginOptions?.apiKey || null;';
-  return content.replace(originalKeyLine, patchedKeyLine);
+// 1. Patch index.js to pass kv to createClient
+patchFile(indexFile, (content) => {
+  return content.replace(
+    'const { complete } = createClient(options);',
+    'const { complete } = createClient(options, kv);'
+  );
 });
+console.log('[PATCH] index.js successfully patched.');
 
+// 2. Patch llm-client.js to support dynamic configurations from kv
+patchFile(llmClientFile, (content) => {
+  // Update createClient declaration
+  content = content.replace(
+    'export function createClient(pluginOptions) {',
+    'export function createClient(pluginOptions, kv) {'
+  );
+
+  // Update getConfig to resolve options from kv dynamically
+  const originalGetConfig = `  function getConfig() {
+    return {
+      endpoint: pluginOptions?.endpoint,
+      model: pluginOptions?.model,
+      apiKeyEnv: pluginOptions?.apiKeyEnv,
+      maxTokens: pluginOptions?.maxTokens ?? DEFAULTS.maxTokens,
+      reasoningEffort: pluginOptions?.reasoningEffort ?? DEFAULTS.reasoningEffort,
+      chatTemplateKwargs: normalizeChatTemplateKwargs(
+        pluginOptions?.chatTemplateKwargs ?? DEFAULTS.chatTemplateKwargs,
+      ),
+      retries: normalizeRetries(pluginOptions?.retries ?? DEFAULTS.retries),
+    };
+  }`;
+
+  const patchedGetConfig = `  function getConfig() {
+    return {
+      endpoint: kv?.get("stt.endpoint") || pluginOptions?.endpoint,
+      model: kv?.get("stt.llmModel") || pluginOptions?.model,
+      apiKeyEnv: kv?.get("stt.sttApiKeyEnv") !== undefined ? kv.get("stt.sttApiKeyEnv") : pluginOptions?.apiKeyEnv,
+      apiKey: kv?.get("stt.apiKey") || pluginOptions?.apiKey,
+      maxTokens: pluginOptions?.maxTokens ?? DEFAULTS.maxTokens,
+      reasoningEffort: pluginOptions?.reasoningEffort ?? DEFAULTS.reasoningEffort,
+      chatTemplateKwargs: normalizeChatTemplateKwargs(
+        pluginOptions?.chatTemplateKwargs ?? DEFAULTS.chatTemplateKwargs,
+      ),
+      retries: normalizeRetries(pluginOptions?.retries ?? DEFAULTS.retries),
+    };
+  }`;
+
+  content = content.replace(originalGetConfig, patchedGetConfig);
+
+  const originalKeyLine = 'const apiKey = cfg.apiKeyEnv ? process.env[cfg.apiKeyEnv] : null;';
+  const patchedKeyLine = 'const apiKey = (cfg.apiKeyEnv ? process.env[cfg.apiKeyEnv] : null) || cfg.apiKey || null;';
+  content = content.replace(originalKeyLine, patchedKeyLine);
+
+  return content;
+});
 console.log('[PATCH] llm-client.js successfully patched.');
 
-// 2. Patch stt.js to support direct apiKey option fallback, language forcing, and simulated recording
+// 3. Patch stt.js to support dynamic STT configs and /voice menu command
 patchFile(sttFile, (content) => {
   // Import https at the top
   content = 'import https from "node:https";\n' + content;
@@ -380,7 +429,7 @@ function downloadModel(modelFile, destPath, toast) {
 
   content = content.replace(originalTranscribe, patchedTranscribe);
 
-  // Replace transcribeApi function to support API language specification and direct API key fallback
+  // Replace transcribeApi function to support API language specification and dynamic configs from KV
   const originalTranscribeApi = `async function transcribeApi(kv) {
   if (!sttApiEndpoint || !sttApiModel) {
     return { error: "STT API not configured" };
@@ -440,10 +489,14 @@ function downloadModel(modelFile, destPath, toast) {
 }`;
 
   const patchedTranscribeApi = `async function transcribeApi(kv) {
-  if (!sttApiEndpoint || !sttApiModel) {
+  const apiEndpoint = kv.get("stt.sttEndpoint") !== undefined ? kv.get("stt.sttEndpoint") : sttApiEndpoint;
+  const apiModel = kv.get("stt.sttModel") || sttApiModel;
+  const apiKeyEnvName = kv.get("stt.sttApiKeyEnv") !== undefined ? kv.get("stt.sttApiKeyEnv") : sttApiKeyEnv;
+
+  if (!apiEndpoint || !apiModel) {
     return { error: "STT API not configured" };
   }
-  const model = kv.get("stt.api.model") || sttApiModel;
+  const model = kv.get("stt.api.model") || apiModel;
 
   if (!fs.existsSync(WAV_FILE)) {
     return { error: "No recording file - sox may have failed to capture audio" };
@@ -463,12 +516,12 @@ function downloadModel(modelFile, destPath, toast) {
     const lang = kv.get("stt.language", "pt");
     form.append("language", lang);
 
-    const url = sttApiEndpoint.endsWith("/")
-      ? \`\${sttApiEndpoint}audio/transcriptions\`
-      : \`\${sttApiEndpoint}/audio/transcriptions\`;
+    const url = apiEndpoint.endsWith("/")
+      ? \`\${apiEndpoint}audio/transcriptions\`
+      : \`\${apiEndpoint}/audio/transcriptions\`;
 
     const headers = {};
-    const apiKey = (sttApiKeyEnv ? process.env[sttApiKeyEnv] : null) || sttApiKeyVal;
+    const apiKey = (apiKeyEnvName ? process.env[apiKeyEnvName] : null) || sttApiKeyVal;
     if (apiKey) headers["Authorization"] = "Bearer " + apiKey;
 
     const resp = await fetch(url, {
@@ -500,7 +553,7 @@ function downloadModel(modelFile, destPath, toast) {
 
   content = content.replace(originalTranscribeApi, patchedTranscribeApi);
 
-  // Set sttApiKeyVal when registerSTT is run
+  // Set sttApiKeyVal when registerSTT is run and update dynamic sttApiEndpoint resolve in pipeline
   const originalRegisterBlock = `  if (opts?.sttEndpoint) {
     sttApiEndpoint = opts.sttEndpoint;
     sttApiModel = opts.sttModel || "whisper-large-v3-turbo";
@@ -516,7 +569,7 @@ function downloadModel(modelFile, destPath, toast) {
 
   content = content.replace(originalRegisterBlock, patchedRegisterBlock);
 
-  // Replace doTranscribePipeline
+  // Replace doTranscribePipeline to use dynamic sttApiEndpoint
   const originalDoTranscribePipeline = `async function doTranscribePipeline(kv, complete, client, toast, systemPrompt, submit = false) {
   processing = true;
   try {
@@ -572,7 +625,8 @@ function downloadModel(modelFile, destPath, toast) {
       writeSilentWav(WAV_FILE);
     }
 
-    const result = sttApiEndpoint ? await transcribeApi(kv) : await transcribe(kv, toast);
+    const currentEndpoint = kv.get("stt.sttEndpoint") !== undefined ? kv.get("stt.sttEndpoint") : sttApiEndpoint;
+    const result = currentEndpoint ? await transcribeApi(kv) : await transcribe(kv, toast);
 
     if (result.error) {
       if (isSimulated) {
@@ -619,7 +673,215 @@ function downloadModel(modelFile, destPath, toast) {
 
   content = content.replace(originalDoTranscribePipeline, patchedDoTranscribePipeline);
 
+  // Register the new /voice setup command
+  const originalRegisterSTTFnStart = `export function registerSTT(api, kv, complete, prompts, opts) {
+  const client = api.client;
+  const systemPrompt = prompts?.stt || STT_SYSTEM_PROMPT;
+  function toast(message, variant = "info") {
+    api.ui.toast({ message, variant, duration: 3000 });
+  }
+
+  if (opts?.sttEndpoint) {
+    sttApiEndpoint = opts.sttEndpoint;
+    sttApiModel = opts.sttModel || "whisper-large-v3-turbo";
+    sttApiKeyEnv = opts.sttApiKeyEnv || null;
+  }
+  sttApiKeyVal = opts?.apiKey || null;
+
+  return [`;
+
+  const voiceCommandCode = `    {
+      title: "Voice: Setup (Configurar Voz)",
+      value: "voice.setup",
+      description: "Configure language, provider (Groq/Ollama), and audio settings",
+      slash: { name: "voice" },
+      onSelect() {
+        const showMainMenu = () => {
+          const provider = kv.get("stt.provider") || (sttApiEndpoint ? "groq" : "ollama");
+          const language = kv.get("stt.language", "pt");
+          const mic = kv.get("stt.mic", "") || "System default";
+          
+          api.ui.dialog.replace(() =>
+            api.ui.DialogSelect({
+              title: "Voice Setup (Configuração de Voz)",
+              options: [
+                {
+                  title: \`1. Idioma (Language): [\${language}]\`,
+                  value: "voice.lang",
+                  onSelect() {
+                    api.ui.dialog.replace(() =>
+                      api.ui.DialogSelect({
+                        title: "Select Language / Selecionar Idioma",
+                        options: [
+                          { title: "Português (pt)", value: "pt", onSelect() { kv.set("stt.language", "pt"); toast("Idioma: pt"); showMainMenu(); } },
+                          { title: "English (en)", value: "en", onSelect() { kv.set("stt.language", "en"); toast("Language: en"); showMainMenu(); } },
+                          { title: "Español (es)", value: "es", onSelect() { kv.set("stt.language", "es"); toast("Idioma: es"); showMainMenu(); } },
+                          { title: "Auto-detect (auto)", value: "auto", onSelect() { kv.set("stt.language", "auto"); toast("Language: auto"); showMainMenu(); } }
+                        ]
+                      })
+                    );
+                  }
+                },
+                {
+                  title: \`2. Provedor (Provider): [\${provider.toUpperCase()}]\`,
+                  value: "voice.provider",
+                  onSelect() {
+                    api.ui.dialog.replace(() =>
+                      api.ui.DialogSelect({
+                        title: "Select Provider / Selecionar Provedor",
+                        options: [
+                          {
+                            title: "Groq Cloud (Recomendado - Rápido & Nuvem)",
+                            value: "groq",
+                            onSelect() {
+                              kv.set("stt.provider", "groq");
+                              kv.set("stt.sttEndpoint", "https://api.groq.com/openai/v1");
+                              kv.set("stt.sttModel", "whisper-large-v3-turbo");
+                              kv.set("stt.endpoint", "https://api.groq.com/openai/v1");
+                              kv.set("stt.llmModel", "llama3-8b-8192");
+                              kv.set("stt.sttApiKeyEnv", "GROQ_API_KEY");
+                              const envKey = process.env.GROQ_API_KEY || "";
+                              if (envKey) {
+                                kv.set("stt.apiKey", envKey);
+                              }
+                              toast("Provedor alterado para Groq Cloud");
+                              showMainMenu();
+                            }
+                          },
+                          {
+                            title: "Ollama Local (Offline & Processamento Local)",
+                            value: "ollama",
+                            onSelect() {
+                              kv.set("stt.provider", "ollama");
+                              kv.set("stt.sttEndpoint", "");
+                              kv.set("stt.sttModel", "");
+                              kv.set("stt.endpoint", "http://localhost:11434/v1");
+                              kv.set("stt.llmModel", "llama3.2");
+                              kv.set("stt.sttApiKeyEnv", "");
+                              toast("Provedor alterado para Ollama Local");
+                              showMainMenu();
+                            }
+                          }
+                        ]
+                      })
+                    );
+                  }
+                },
+                {
+                  title: "3. Importar Groq API Key da variável de ambiente",
+                  value: "voice.import_key",
+                  onSelect() {
+                    const envKey = process.env.GROQ_API_KEY || "";
+                    if (envKey) {
+                      kv.set("stt.apiKey", envKey);
+                      toast("Chave de API do Groq importada com sucesso!", "success");
+                    } else {
+                      toast("Variável GROQ_API_KEY não encontrada no ambiente", "error");
+                    }
+                    showMainMenu();
+                  }
+                },
+                {
+                  title: "4. Selecionar Modelo LLM (Groq/Ollama)",
+                  value: "voice.llm_model",
+                  onSelect() {
+                    if (provider === "groq") {
+                      api.ui.dialog.replace(() =>
+                        api.ui.DialogSelect({
+                          title: "Select Groq LLM Model",
+                          options: [
+                            { title: "llama3-8b-8192 (Default)", value: "llama3-8b-8192", onSelect() { kv.set("stt.llmModel", "llama3-8b-8192"); toast("Modelo: llama3-8b-8192"); showMainMenu(); } },
+                            { title: "llama-3.3-70b-versatile", value: "llama-3.3-70b-versatile", onSelect() { kv.set("stt.llmModel", "llama-3.3-70b-versatile"); toast("Modelo: llama-3.3-70b-versatile"); showMainMenu(); } },
+                            { title: "mixtral-8x7b-32768", value: "mixtral-8x7b-32768", onSelect() { kv.set("stt.llmModel", "mixtral-8x7b-32768"); toast("Modelo: mixtral-8x7b-32768"); showMainMenu(); } }
+                          ]
+                        })
+                      );
+                    } else {
+                      api.ui.dialog.replace(() =>
+                        api.ui.DialogSelect({
+                          title: "Select Ollama LLM Model",
+                          options: [
+                            { title: "llama3.2 (Default)", value: "llama3.2", onSelect() { kv.set("stt.llmModel", "llama3.2"); toast("Modelo: llama3.2"); showMainMenu(); } },
+                            { title: "mistral", value: "mistral", onSelect() { kv.set("stt.llmModel", "mistral"); toast("Modelo: mistral"); showMainMenu(); } },
+                            { title: "qwen2.5-coder", value: "qwen2.5-coder", onSelect() { kv.set("stt.llmModel", "qwen2.5-coder"); toast("Modelo: qwen2.5-coder"); showMainMenu(); } }
+                          ]
+                        })
+                      );
+                    }
+                  }
+                },
+                {
+                  title: "5. Selecionar Modelo Whisper (Local)",
+                  value: "voice.whisper_model",
+                  onSelect() {
+                    const currentModel = getModelName(kv);
+                    api.ui.dialog.replace(() =>
+                      api.ui.DialogSelect({
+                        title: "Select Whisper Model",
+                        options: Object.entries(MODELS).map(([key, v]) => ({
+                          title: v.label,
+                          value: key,
+                          onSelect() {
+                            kv.set("stt.model", key);
+                            toast(\`Whisper model: \${v.label}\`);
+                            showMainMenu();
+                          }
+                        }))
+                      })
+                    );
+                  }
+                },
+                {
+                  title: \`6. Microfone (Mic): [\${mic}]\`,
+                  value: "voice.mic",
+                  onSelect() {
+                    const currentMic = kv.get("stt.mic", "");
+                    const devices = listInputDevices();
+                    api.ui.dialog.replace(() =>
+                      api.ui.DialogSelect({
+                        title: "Select Microphone",
+                        options: [
+                          {
+                            title: "System default",
+                            value: "",
+                            onSelect() {
+                              kv.set("stt.mic", "");
+                              toast("Mic: System default");
+                              showMainMenu();
+                            }
+                          },
+                          ...devices.map((name) => ({
+                            title: name,
+                            value: name,
+                            onSelect() {
+                              kv.set("stt.mic", name);
+                              toast(\`Mic: \${name}\`);
+                              showMainMenu();
+                            }
+                          }))
+                        ]
+                      })
+                    );
+                  }
+                },
+                {
+                  title: "Sair (Fechar)",
+                  value: "voice.exit",
+                  onSelect() {
+                    api.ui.dialog.clear();
+                  }
+                }
+              ]
+            })
+          );
+        };
+        showMainMenu();
+      }
+    },`;
+
+  content = content.replace(originalRegisterSTTFnStart, originalRegisterSTTFnStart + '\n' + voiceCommandCode);
+
   return content;
 });
 
-console.log('[PATCH] stt.js successfully patched with simulated recording, language config, and apiKey fallback.');
+console.log('[PATCH] stt.js successfully patched with language configuration, simulation, and /voice menu command.');
