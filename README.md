@@ -84,10 +84,14 @@ OpencodePortable/
 │   │   ├── .opencode/
 │   │   │   └── workspace.json     # Modo (Local, Nuvem, Desativado)
 │   │   └── multitask-worktrees/
+├── scripts/                       # Scripts auxiliares
+│   ├── nvidia_router.py           # NVIDIA Model Router
+│   └── start_nvidia_router.bat    # Inicia o router
+├── docs/                          # Documentação
+│   └── 5-nvidia-router/           # Docs do NVIDIA Router
+├── tests/                         # Testes
 ├── opencode.bat                   # Wrapper → chama opencode.ps1
 ├── opencode.ps1                   # Orquestrador principal
-├── scripts/                       # Scripts auxiliares
-├── tests/                         # Testes
 └── README.md
 ```
 
@@ -123,6 +127,23 @@ Ao executar `opencode.bat` sem argumentos:
 | `scripts\cleanup.bat` | Limpa cache e logs |
 | `scripts\export-import.bat` | Exporta/importa config |
 | `scripts\package.bat` | Empacota em ZIP |
+| `scripts\nvidia_router.py` | NVIDIA Model Router (proxy local) |
+| `scripts\start_nvidia_router.bat` | Inicia o NVIDIA Router |
+
+## NVIDIA Model Router
+
+Proxy server local que roteia requisições do opencode entre múltiplos modelos gratuitos da NVIDIA, com roteamento inteligente e fallback automático.
+
+```powershell
+# 1. Iniciar o router (terminal separado)
+python scripts/nvidia_router.py
+
+# 2. No opencode, selecionar "NVIDIA Router (local)" → "auto"
+```
+
+**Modelos primários**: Nemotron 3 Nano Omni, Gemma 4, Mistral Medium, Llama 3.3, DeepSeek V4 Flash
+
+**Documentação completa**: [docs/5-nvidia-router/README.md](docs/5-nvidia-router/README.md)
 
 ## Configuração
 
@@ -148,6 +169,7 @@ Edite `config/opencode.jsonc`:
 | **OpenAI** | `https://api.openai.com/v1` |
 | **Anthropic** | `https://api.anthropic.com/v1` |
 | **Groq** | `https://api.groq.com/openai/v1` |
+| **NVIDIA Router** | `http://localhost:9393/v1` (local) |
 
 ## Requisitos
 
