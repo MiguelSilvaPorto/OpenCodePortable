@@ -624,7 +624,7 @@ function Ensure-BrainStructure {
 "@ | Set-Content -Path $gitignore -Encoding UTF8
         
         # Copiar scripts brain se nao existirem
-        $brainScripts = @("brain_memory.py", "brain_mcp.py")
+        $brainScripts = @("brain_memory.py", "brain_mcp.py", "brain_checkpoint.py", "brain_monitor.py", "skill_mcp.py")
         foreach ($script in $brainScripts) {
             $scriptSource = Join-Path $OPENCODE_HOME ".brain\scripts\$script"
             $scriptDest = Join-Path $scriptsDir $script
@@ -641,6 +641,13 @@ function Ensure-BrainStructure {
             if ((Test-Path $scriptSource) -and -not (Test-Path $scriptDest)) {
                 Copy-Item -Path $scriptSource -Destination $scriptDest -Force
             }
+        }
+        
+        # Copiar skills
+        $skillsSource = Join-Path $OPENCODE_HOME ".brain\skills"
+        $skillsDest = Join-Path $brainDir "skills"
+        if ((Test-Path $skillsSource) -and -not (Test-Path $skillsDest)) {
+            Copy-Item -Path $skillsSource -Destination $skillsDest -Recurse -Force
         }
         
         Write-Log "BRAIN" "STRUCTURE_CREATED" @{ path = $brainDir }
@@ -664,6 +671,28 @@ function Invoke-OpenCode {
     $env:OPENCODE_DISABLE_PROJECT_CONFIG = "1"
     $env:OPENCODE_EXPERIMENTAL_BACKGROUND_SUBAGENTS = "true"
     $env:OPENCODE_EXPERIMENTAL_PLAN_MODE = "true"
+
+    # Iniciar monitor de checkpoint em background
+    $brainDir = Join-Path $ProjectPath ".brain"
+    $monitorPidFile = Join-Path $brainDir "monitor.pid"
+    $monitorScript = Join-Path $brainDir "scripts\brain_monitor.py"
+    
+    if ((Test-Path $monitorScript) -and -not (Test-Path $monitorPidFile)) {
+        # Ler session_id se existir
+        $sessionFile = Join-Path $brainDir "current_session.txt"
+        $sessionId = "default"
+        if (Test-Path $sessionFile) {
+            $sessionId = Get-Content $sessionFile -Raw
+        }
+        
+        # Iniciar monitor em background
+        $argList = "-NoProfile -ExecutionPolicy Bypass -File `"$monitorScript`" --session `"$sessionId`" --context 128000"
+        Start-Process powershell.exe -ArgumentList $argList -WindowStyle Hidden
+        Write-Log "BRAIN" "MONITOR_STARTED" @{ session = $sessionId }
+        Write-Host "  Brain monitor iniciado em background" -ForegroundColor Gray
+    } elseif (Test-Path $monitorPidFile) {
+        Write-Log "BRAIN" "MONITOR_ALREADY_RUNNING" @{}
+    }
 
     $exePath = Join-Path $OPENCODE_BIN "opencode.exe"
 

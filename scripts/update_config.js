@@ -7,6 +7,7 @@ const configPath = path.join(home, 'config', 'opencode.jsonc');
 const officeMcp = path.join(home, 'scripts', 'office_mcp.py').replace(/\\/g, '/');
 const projectMcp = path.join(home, 'scripts', 'project_generator.py').replace(/\\/g, '/');
 const brainMcp = path.join(home, '.brain', 'scripts', 'brain_mcp.py').replace(/\\/g, '/');
+const skillMcp = path.join(home, '.brain', 'scripts', 'skill_mcp.py').replace(/\\/g, '/');
 
 let cfg = null;
 let fileExists = false;
@@ -62,6 +63,11 @@ if (!cfg) {
                 type: "local",
                 command: ["python", brainMcp],
                 enabled: true
+            },
+            "skill-mcp": {
+                type: "local",
+                command: ["python", skillMcp],
+                enabled: true
             }
         }
     };
@@ -85,6 +91,12 @@ if (!cfg) {
         cfg.mcp["brain-mcp"] = { type: "local", command: ["python", brainMcp], enabled: true };
     } else {
         cfg.mcp["brain-mcp"].command = ["python", brainMcp];
+    }
+
+    if (!cfg.mcp["skill-mcp"]) {
+        cfg.mcp["skill-mcp"] = { type: "local", command: ["python", skillMcp], enabled: true };
+    } else {
+        cfg.mcp["skill-mcp"].command = ["python", skillMcp];
     }
 
     // Migrar plugin se GROQ_API_KEY estiver disponível
