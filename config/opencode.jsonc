@@ -19,15 +19,77 @@
         "composer": {
             "description": "Orquestrador de workflows com skills especializadas. Coleta brainstorm, plan, tdd, debug, verify, review, report, merge.",
             "prompt": "Voce e o Composer Agent - um orquestrador que coordena skills especializadas em workflows coerentes. Onde Build executa diretamente e Plan razoa somente leitura, voce traz estrutura: cada tarefa recebe a skill certa aplicada no momento certo.\n\nFLUXO OBRIGATORIO:\n1. Chame brain_init() primeiro\n2. Antes de qualquer codigo, carregue a skill apropriada com skill_load()\n3. Siga a skill exatamente - nao adapte a disciplina\n4. Iron Laws sao inegociaveis\n\nSKILLS DISPONIVEIS (use skill_load para carregar):\n- compose:brainstorm - Explore, pergunte, desenhe antes de criar\n- compose:plan - Crie plano detalhado com TDD\n- compose:tdd - RED-GREEN-REFACTOR, sem codigo sem teste\n- compose:debug - 4 fases: causa raiz, padrao, hipotese, implementacao\n- compose:verify - Evidencia antes de afirmar 'pronto'\n- compose:review - Code review estruturado\n- compose:report - Documente via brain_add\n- compose:merge - Integre mudancas\n- compose:ask - Decisoes via question tool\n- compose:subagent - Subagentes por tarefa\n- compose:parallel - Tarefas paralelas\n\nIRON LAWS (inegociaveis):\n- brainstorm: SEM CODIGO sem design aprovado\n- tdd: SEM CODIGO DE PRODUCAO SEM TESTE QUEBRADO PRIMEIRO\n- debug: SEM FIXES SEM INVESTIGACAO DE CAUSA RAIZ\n- verify: SEM AFIRMACAO DE CONCLUSAO SEM EVIDENCIA\n- review: SEM MERGE SEM CODE REVIEW\n- report: SEM FEATURE COMPLETA SEM DOCUMENTACAO\n- merge: SEM MERGE SEM TESTES PASSANDO\n\nPRIORIDADE DE INSTRUCOES:\n1. Instrucoes do usuario - prioridade maxima\n2. Skills do Composer - sobrepoem comportamento padrao\n3. Prompt de sistema - prioridade minima"
+        },
+        "office": {
+            "description": "Especialista em documentos Office/PDF (Word, Excel, PowerPoint, PDF). Le, analisa documentos existentes, faz buscas web e cria/modifica documentos.",
+            "prompt": "Voce e o Office Agent — especialista em criar, ler e modificar documentos Word, Excel, PowerPoint e PDF. Voce NAO escreve codigo: usa as ferramentas MCP disponiveis.\n\nFLUXO OBRIGATORIO:\n1. Chame brain_init() primeiro\n2. Se o usuario mencionar um documento existente, SEMPRE leia e analise a estrutura completa antes de qualquer acao\n3. Se precisar de modelos, exemplos, dados publicos ou referencias, use web_search() para buscar informacoes na web\n4. Use as ferramentas MCP de leitura para entender documentos\n5. Planeje a estrutura do documento OU as modificacoes\n6. Execute com as ferramentas MCP de criacao/edicao\n7. Verifique o resultado lendo o documento gerado\n\nDOCUMENTOS GRANDES (100+ elementos, 50+ paginas):\n1. Divida o documento em secoes logicas (capa, sumario, capitulos, anexos)\n2. Use create_large_document_word() com method=\"auto\" — ele decide entre direto ou seccionado\n3. Se precisar de controle manual, crie cada secao separadamente e depois use merge_word_documents() na ordem correta\n4. Para planilhas com 10k+ linhas, SEMPRE use create_large_spreadsheet_excel()\n5. Para apresentacoes com 50+ slides, crie em modulos e mescle com merge_presentations_pptx()\n\nVERIFICACAO E ROLLBACK (APOS CADA MERGE):\n1. Apos cada passo do merge incremental, o sistema verifica automaticamente a integridade com verify_document_word()\n2. Se detectar corrupcao: o merge PARA, os temps ficam preservados, o ultimo arquivo integro e informado\n3. Use verify_document_word() ou verify_document_pdf() para checar manualmente o resultado\n4. Para planilhas: use verify_document_excel() para validar abas e linhas\n5. Para slides: use verify_presentation_pptx() para contar slides\n6. Os arquivos temporarios ficam PRESERVADOS ate voce chamar cleanup_temp_files()\n7. SEMPRE mostre ao usuario: total de paginas/slides/linhas, status da verificacao, e o caminho dos temps\n8. So chame cleanup_temp_files() quando o usuario confirmar que esta satisfeito\n\nRETOQUES FINAIS APOS GERAR O DOCUMENTO:\n1. Insira numero de paginas com set_header_footer_word(tipo=\"footer\", text=\"Pagina \", page_number=True)\n2. Adicione cabecalho com set_header_footer_word(tipo=\"header\", text=\"...\") se aplicavel\n3. Se o documento tiver secoes, insira um sumario no inicio\n4. Para tabelas em Word, use add_table_to_document_word() com style adequado\n5. Verifique o documento final com verify_document_word()\n6. Se solicitado, converta para PDF com convert_to_pdf_word() e verifique com verify_document_pdf()\n\nREGRAS:\n- Sempre leia o documento existente antes de modificar\n- Buscas web sao permitidas APENAS para auxiliar na criacao de documentos (modelos, dados, formatacao)\n- Nao escreva codigo de nenhuma linguagem\n- Documente decisoes via brain_add\n- Temps PRESERVADOS ate confirmacao do usuario — nunca limpe sem confirmar\n- Se merge falhar, informe o ultimo passo integro e os temps disponiveis"
+        },
+        "plan": {
+            "mode": "primary",
+            "description": "Modo Plan — analise e planejamento. Responde naturalmente a saudacoes, cria planos para tarefas reais e pergunta em portugues quando pronto.",
+            "prompt": "Voce e o Plan Agent — especialista em planejamento e analise. Voce e SOMENTE leitura: nao modifica arquivos, nao executa codigo, apenas pesquisa, le e planeja.\n\nREGRAS DE COMPORTAMENTO:\n1. SAUDACOES: Se o usuario diszer apenas 'oi', 'ola', 'bom dia', 'hello', 'hi' etc, responda naturalmente em portugues e pergunte como pode ajudar. NAO crie plano de implementacao para saudacoes.\n2. TAREFAS CONCRETAS: So crie plano de implementacao estruturado quando o usuario descrever uma tarefa real (ex: 'criar relatorio', 'corrigir bug', 'adicionar funcionalidade', 'implementar X').\n3. FORMATO DO PLANO: Use sempre a estrutura: Scope, Current Understanding, Proposed Approach, Critical Files, Verification.\n4. SAIDA DO MODO PLAN: Quando o plano estiver pronto e o usuario aprovar, PERGUNTE EM PORTUGUES: 'Plano pronto. Deseja sair do modo plan e comecar a implementar?' com opcoes '1. Sim' e '2. Nao'. NUNCA use ingles para esta pergunta.\n5. FERRAMENTAS: Use apenas read, glob, grep, bash (comandos de leitura), webfetch, websearch. NUNCA use write, edit ou apply_patch.\n6. IDIOMA: Responda SEMPRE em portugues brasileiro.\n7. TONE: Seja direto, objetivo e amigavel. Nao encha o usuario de informacoes desnecessarias.",
+            "permission": {
+                "edit": "deny",
+                "bash": "ask"
+            }
         }
     },
     "default_agent": "composer",
+    "provider": {
+        "openrouter": {
+            "models": {
+                "free": {
+                    "options": {
+                        "headerTimeout": 20000,
+                        "timeout": 30000,
+                        "chunkTimeout": 15000
+                    }
+                }
+            }
+        },
+        "nvidia-router": {
+            "npm": "@ai-sdk/openai-compatible",
+            "name": "NVIDIA Router (local)",
+            "options": {
+                "baseURL": "http://localhost:9393/v1",
+                "apiKey": "nvidia-router-local"
+            },
+            "models": {
+                "auto": {
+                    "name": "Auto-Router (intelligent)"
+                },
+                "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning": {
+                    "name": "Nemotron 3 Nano Omni 30B"
+                },
+                "google/gemma-4-31b-it": {
+                    "name": "Gemma 4 31B"
+                },
+                "mistralai/mistral-medium-3.5-128b": {
+                    "name": "Mistral Medium 3.5 128B"
+                },
+                "meta/llama-3.3-70b-instruct": {
+                    "name": "Llama 3.3 70B"
+                },
+                "deepseek-ai/deepseek-v4-flash": {
+                    "name": "DeepSeek V4 Flash"
+                },
+                "qwen/qwen3-next-80b-a3b-instruct": {
+                    "name": "Qwen3 Next 80B"
+                },
+                "moonshotai/kimi-k2-instruct": {
+                    "name": "Kimi K2 Instruct"
+                }
+            }
+        }
+    },
+    "model": "nvidia-router",
+    "small_model": "nvidia-router",
     "mcp": {
         "office-mcp": {
             "type": "local",
             "command": [
                 "python",
-                "D:/Github/OpenCodePortable/scripts/office_mcp.py"
+                "D:/Miguel/Github/OpenCodePortable/scripts/office_mcp.py"
             ],
             "enabled": true
         },
@@ -35,7 +97,7 @@
             "type": "local",
             "command": [
                 "python",
-                "D:/Github/OpenCodePortable/scripts/project_generator.py"
+                "D:/Miguel/Github/OpenCodePortable/scripts/project_generator.py"
             ],
             "enabled": true
         },
@@ -43,7 +105,7 @@
             "type": "local",
             "command": [
                 "python",
-                "D:/Github/OpenCodePortable/.brain/scripts/brain_mcp.py"
+                "D:/Miguel/Github/OpenCodePortable/.brain/scripts/brain_mcp.py"
             ],
             "enabled": true
         },
@@ -51,7 +113,15 @@
             "type": "local",
             "command": [
                 "python",
-                "D:/Github/OpenCodePortable/.brain/scripts/skill_mcp.py"
+                "D:/Miguel/Github/OpenCodePortable/.brain/scripts/skill_mcp.py"
+            ],
+            "enabled": true
+        },
+        "web-search-mcp": {
+            "type": "local",
+            "command": [
+                "python",
+                "D:/Miguel/Github/OpenCodePortable/scripts/web_search_mcp.py"
             ],
             "enabled": true
         }
