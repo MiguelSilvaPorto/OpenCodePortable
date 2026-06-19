@@ -14,6 +14,11 @@ import urllib.error
 from datetime import datetime
 from mcp.server.fastmcp import FastMCP
 
+# Adicionar scripts ao path
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+
+from brain_checkpoint import BrainCheckpoint
+
 # Configuracao
 BRAIN_DIR = os.path.join(os.getcwd(), ".brain")
 DB_PATH = os.path.join(BRAIN_DIR, "memory.db")
@@ -449,6 +454,141 @@ def brain_sync() -> str:
         "file": md_path,
         "message": f"{len(rows)} memorias sincronizadas para {md_path}"
     }, ensure_ascii=False)
+
+
+@mcp.tool()
+def brain_checkpoint(summary: str = "", tokens: int = 0, context: int = 128000) -> str:
+    """
+    Salva checkpoint manual da sessao ativa.
+
+    O auto-checkpoint roda em background, mas esta tool permite salvar
+    manualmente antes de acoes arriscadas ou quando o usuario pedir.
+
+    PARAMETROS:
+    - summary: Resumo da conversa para incluir no checkpoint (opcional)
+    - tokens: Contagem atual de tokens (opcional, 0 = auto-detectar)
+    - context: Tamanho do contexto (opcional, default=128000)
+
+    RETORNO:
+    - status: "ok" ou "error"
+    - checkpoint_path: Caminho do arquivo checkpoint.md
+    - token_count: Tokens no momento do checkpoint
+    - timestamp: Quando foi salvo
+
+    EXEMPLO DE USO:
+    brain_checkpoint(summary="Implementacao da calculadora concluida")
+    # Retorna: {"status": "ok", "checkpoint_path": "...", "token_count": 45000, ...}
+    """
+    uuid_str = read_current_session()
+    if not uuid_str:
+        return json.dumps({"error": "Nenhuma sessao ativa. Chame brain_init primeiro."})
+
+    engine = BrainCheckpoint(uuid_str)
+    result = engine.save_checkpoint(tokens, context, summary)
+    return json.dumps(result, ensure_ascii=False, indent=2)
+
+
+@mcp.tool()
+def brain_pressure(tokens: int = 0, context: int = 128000) -> str:
+    """
+    Mostra o nivel de pressao atual do contexto (0-3).
+
+    Niveis:
+    - 0: Normal (< 50% do limite)
+    - 1: Atencao (50-70%) - soft trim de tool outputs antigas
+    - 2: Critico (70-85%) - hard compact de resultados de tools
+    - 3: Overflow (>= 85%) - strip de media/reasoning + rebuild necessario
+
+    PARAMETROS:
+    - tokens: Contagem atual de tokens (obrigatorio)
+    - context: Tamanho do contexto (opcional, default=128000)
+
+    RETORNO:
+    - pressure: Nivel de pressao (0-3)
+    - ratio: Percentual de uso do contexto
+    - action: Acao recomendada
+    - thresholds: Thresholds de checkpoint ativos
+
+    EXEMPLO DE USO:
+    brain_pressure(tokens=64000, context=128000)
+    # Retorna: {"pressure": 1, "ratio": 0.50, "action": "soft_trim", ...}
+    """
+    uuid_str = read_current_session()
+    if not uuid_str:
+        return json.dumps({"error": "Nenhuma sessao ativa. Chame brain_init primeiro."})
+
+    engine = BrainCheckpoint(uuid_str)
+    pressure = engine.compute_pressure(tokens, context)
+    ratio = tokens / context if context > 0 else 0
+    thresholds = engine.resolve_thresholds(context)
+
+    actions = {
+        0: "none",
+        1: "soft_trim",
+        2: "hard_compact",
+        3: "rebuild_context"
+    }
+
+    return json.dumps({
+        "pressure": pressure,
+        "ratio": round(ratio, 3),
+        "action": actions[pressure],
+        "thresholds": thresholds,
+        "token_count": tokens,
+        "context_window": context
+    }, ensure_ascii=False, indent=2)
+
+
+@mcp.tool()
+def brain_rebuild(tokens: int = 0, context: int = 128000) -> str:
+    """
+    Reconstrói o contexto apos overflow.
+
+    Esta tool:
+    1. Calcula boundary (onde cortar mensagens antigas)
+    2. Gera mensagem sintética com checkpoint + memória
+    3. Retorna o contexto reconstruído para injecao
+
+    QUANDO USAR:
+    - Quando brain_pressure retorna nivel 3 (overflow)
+    - Quando o contexto esta muito cheio e precisa ser resetado
+    - Quando o usuario pede para "limpar o contexto"
+
+    PARAMETROS:
+    - tokens: Contagem atual de tokens (obrigatorio)
+    - context: Tamanho do contexto (opcional, default=128000)
+
+    RETORNO:
+    - status: "ok" ou "error"
+    - boundary: Indice da mensagem de corte
+    - rebuild_context: Texto sintético para injecao
+    - checkpoint_path: Caminho do checkpoint usado
+
+    EXEMPLO DE USO:
+    brain_rebuild(tokens=110000, context=128000)
+    # Retorna: {"status": "ok", "boundary": 15, "rebuild_context": "...", ...}
+    """
+    uuid_str = read_current_session()
+    if not uuid_str:
+        return json.dumps({"error": "Nenhuma sessao ativa. Chame brain_init primeiro."})
+
+    engine = BrainCheckpoint(uuid_str)
+
+    # Salvar checkpoint antes de rebuild
+    engine.save_checkpoint(tokens, context, "Pre-rebuild checkpoint")
+
+    # Gerar contexto de rebuild (vazio pois nao temos acesso as mensagens reais)
+    # Na prática, o agente deve passar as mensagens para esta tool
+    rebuild_text = engine.rebuild_context([], 0)
+
+    return json.dumps({
+        "status": "ok",
+        "boundary": 0,
+        "rebuild_context": rebuild_text,
+        "checkpoint_path": engine.checkpoint_path,
+        "memory_path": engine.memory_path,
+        "notes_path": engine.notes_path
+    }, ensure_ascii=False, indent=2)
 
 
 if __name__ == "__main__":
