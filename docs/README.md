@@ -11,6 +11,7 @@ docs/
 ├── 2-worktrees/           # Sistema de Worktrees
 ├── 3-mcp/                 # Ferramentas MCP
 ├── 4-plugins/             # Plugins
+├── 5-nvidia-router/       # NVIDIA Model Router
 ├── scripts/               # Scripts Auxiliares
 ├── data/                  # Dados Runtime
 └── tests/                 # Testes
@@ -52,6 +53,12 @@ Documentacao sobre os plugins do OpenCode.
 - [Voice Plugin](4-plugins/voice-plugin.md)
 - [Workspace Plugin](4-plugins/workspace-plugin.md)
 - [Auto-Switch Plugin](4-plugins/auto-switch-plugin.md)
+
+## 5. NVIDIA Model Router
+
+Proxy server local que roteia requisicoes entre multiplos modelos gratuitos da NVIDIA com fallback inteligente.
+
+- [Visao Geral](5-nvidia-router/README.md)
 
 ## Scripts Auxiliares
 
