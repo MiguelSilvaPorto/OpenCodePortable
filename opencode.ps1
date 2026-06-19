@@ -350,6 +350,21 @@ function Run-InitialSetup {
         }
     }
 
+    # Verificar modelo de embedding para o .brain
+    $ollama = Get-Command ollama -ErrorAction SilentlyContinue
+    if ($ollama) {
+        $models = & ollama list 2>$null
+        if ($null -eq ($models | Select-String "nomic-embed-text")) {
+            Write-Log "BRAIN" "PULLING_EMBED" @{ model = "nomic-embed-text" }
+            Start-Process ollama -ArgumentList "pull nomic-embed-text" -WindowStyle Hidden
+            Write-Log "BRAIN" "PULL_STARTED" @{ model = "nomic-embed-text"; note = "Download em background" }
+        } else {
+            Write-Log "BRAIN" "EMBED_OK" @{ model = "nomic-embed-text" }
+        }
+    } else {
+        Write-Log "BRAIN" "OLLAMA_NOT_FOUND" @{ hint = "Instale o Ollama em ollama.ai para busca vetorial" } "WARN"
+    }
+
     # Garantir que a pasta config existe
     if (-not (Test-Path $OPENCODE_CONFIG)) {
         New-Item -ItemType Directory -Path $OPENCODE_CONFIG -Force | Out-Null
@@ -377,7 +392,7 @@ function Run-InitialSetup {
     Write-Host "============================================" -ForegroundColor Green
     Write-Host "  Configuracao Inicial Concluida!" -ForegroundColor Green
     Write-Host "============================================" -ForegroundColor Green
-    Write-Host "  Para usar microfone: ollama serve & Ctrl+R" -ForegroundColor Gray
+    Write-Host "  Brain Memory: busca vetorial com nomic-embed-text" -ForegroundColor Gray
     Write-Host ""
     return $true
 }
@@ -424,7 +439,7 @@ function Select-Project {
         New-Item -ItemType Directory -Path $PROJECTS_ROOT -Force | Out-Null
     }
 
-    $dirs = Get-ChildItem $PROJECTS_ROOT -Directory -ErrorAction SilentlyContinue | Where-Object { $_.Name -ne "multitask-worktrees" }
+        $dirs = Get-ChildItem $PROJECTS_ROOT -Directory -ErrorAction SilentlyContinue
 
     # Se nenhum projeto existe → criar Default e abrir direto
     if ((-not $dirs -or $dirs.Count -eq 0) -and -not $ProvidedPath) {
@@ -450,7 +465,7 @@ function Select-Project {
 
     # Se tem mais de 1 projeto → mostrar seletor
     while ($true) {
-        $dirs = Get-ChildItem $PROJECTS_ROOT -Directory -ErrorAction SilentlyContinue | Where-Object { $_.Name -ne "multitask-worktrees" }
+    $dirs = Get-ChildItem $PROJECTS_ROOT -Directory -ErrorAction SilentlyContinue
 
         Clear-Host
         Write-Host "============================================" -ForegroundColor Cyan
@@ -504,6 +519,14 @@ function Select-Project {
             }
             catch { }
             Pop-Location
+
+            # Copiar AGENTS.md para o novo projeto
+            $agentsSource = Join-Path $OPENCODE_HOME "AGENTS.md"
+            $agentsDest = Join-Path $newDir "AGENTS.md"
+            if ((Test-Path $agentsSource) -and -not (Test-Path $agentsDest)) {
+                Copy-Item -Path $agentsSource -Destination $agentsDest -Force
+                Write-Log "PROJECT" "AGENTS_COPIED" @{ path = $newDir }
+            }
 
             # GitHub CLI (opcional)
             if (Get-Command gh -ErrorAction SilentlyContinue) {
@@ -567,19 +590,74 @@ function Select-Project {
 }
 
 # ============================================================================
+# SISTEMA .BRAIN - MEMORIA PORTATIL
+# ============================================================================
+
+function Ensure-BrainStructure {
+    param([string]$ProjectPath)
+    
+    $brainDir = Join-Path $ProjectPath ".brain"
+    $sessionsDir = Join-Path $brainDir "sessions"
+    $scriptsDir = Join-Path $brainDir "scripts"
+    $gitignore = Join-Path $brainDir ".gitignore"
+    $agentsMd = Join-Path $ProjectPath "AGENTS.md"
+    
+    # Copiar AGENTS.md se nao existir
+    $agentsSource = Join-Path $OPENCODE_HOME "AGENTS.md"
+    if ((Test-Path $agentsSource) -and -not (Test-Path $agentsMd)) {
+        Copy-Item -Path $agentsSource -Destination $agentsMd -Force
+        Write-Log "BRAIN" "AGENTS_COPIED" @{ path = $ProjectPath }
+    }
+    
+    # Criar estrutura .brain se nao existir
+    if (-not (Test-Path $brainDir)) {
+        New-Item -ItemType Directory -Path $sessionsDir -Force | Out-Null
+        New-Item -ItemType Directory -Path $scriptsDir -Force | Out-Null
+        
+        # Criar .gitignore
+        @"
+*
+!.gitignore
+!scripts/
+!scripts/**
+!**/metadata.json
+"@ | Set-Content -Path $gitignore -Encoding UTF8
+        
+        # Copiar scripts brain se nao existirem
+        $brainScripts = @("brain_memory.py", "brain_mcp.py")
+        foreach ($script in $brainScripts) {
+            $scriptSource = Join-Path $OPENCODE_HOME ".brain\scripts\$script"
+            $scriptDest = Join-Path $scriptsDir $script
+            if ((Test-Path $scriptSource) -and -not (Test-Path $scriptDest)) {
+                Copy-Item -Path $scriptSource -Destination $scriptDest -Force
+            }
+        }
+        
+        # Copiar scripts MCP para dentro do projeto
+        $mcpScripts = @("office_mcp.py", "project_generator.py")
+        foreach ($script in $mcpScripts) {
+            $scriptSource = Join-Path $OPENCODE_HOME "scripts\$script"
+            $scriptDest = Join-Path $scriptsDir $script
+            if ((Test-Path $scriptSource) -and -not (Test-Path $scriptDest)) {
+                Copy-Item -Path $scriptSource -Destination $scriptDest -Force
+            }
+        }
+        
+        Write-Log "BRAIN" "STRUCTURE_CREATED" @{ path = $brainDir }
+    }
+}
+
+# ============================================================================
 # INICIALIZACAO DO OPENCODE
 # ============================================================================
 
 function Invoke-OpenCode {
     param([string]$ProjectPath)
-
+    
+    # Garantir estrutura .brain
+    Ensure-BrainStructure -ProjectPath $ProjectPath
+    
     Push-Location $ProjectPath
-
-    # Limpar multitask-worktrees temporario se existir
-    $mtDir = Join-Path $ProjectPath "multitask-worktrees"
-    if (Test-Path $mtDir) {
-        Remove-Item -Path $mtDir -Recurse -Force -ErrorAction SilentlyContinue
-    }
 
     # Configurar ambiente
     $env:OPENCODE_CONFIG = Join-Path $OPENCODE_CONFIG "opencode.jsonc"

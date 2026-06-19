@@ -6,8 +6,9 @@ Esta secao documenta os servidores MCP (Model Context Protocol) do OpenCode Port
 
 | Arquivo | Descricao |
 |---------|-----------|
-| [office-mcp.md](office-mcp.md) | Servidor MCP para documentos Office |
+| [office-mcp.md](office-mcp.md) | Servidor MCP para documentos Office (51 tools) |
 | [project-mcp.md](project-mcp.md) | Servidor MCP para criacao de projetos |
+| [brain-mcp.md](brain-mcp.md) | Servidor MCP para memoria portatil com busca vetorial |
 | [configuracao.md](configuracao.md) | Como configurar servidores MCP |
 
 ## O que e MCP?
@@ -20,6 +21,7 @@ MCP (Model Context Protocol) e um protocolo que permite ao OpenCode interagir co
 |----------|------|-----------|
 | `office-mcp` | Local (Python) | Word, Excel, PowerPoint, PDF, OCR |
 | `project-mcp` | Local (Python) | Criacao de projetos isolados |
+| `brain-mcp` | Local (Python) | Memoria portatil com busca vetorial |
 
 ## Como Funciona
 
@@ -28,11 +30,13 @@ MCP (Model Context Protocol) e um protocolo que permite ao OpenCode interagir co
 │  OpenCode (opencode.exe)                        │
 │      │                                          │
 │      ├──▶ office-mcp.py (subprocesso)           │
-│      │    └── Ferramentas: create_document,     │
-│      │       read_spreadsheet, add_image...     │
+│      │    └── 51 tools: Word, Excel, PPT, PDF   │
 │      │                                          │
-│      └──▶ project_generator.py (subprocesso)    │
-│           └── Ferramenta: create_isolated_project│
+│      ├──▶ project_generator.py (subprocesso)    │
+│      │    └── Ferramenta: create_isolated_project│
+│      │                                          │
+│      └──▶ brain_mcp.py (subprocesso)            │
+│           └── 6 tools: memoria vetorial         │
 └─────────────────────────────────────────────────┘
 ```
 
