@@ -8,76 +8,93 @@ Servidor MCP para manipulacao de documentos Office e PDF.
 scripts/office_mcp.py
 ```
 
-## Ferramentas Disponiveis (40+)
+## Ferramentas Disponiveis (51)
 
-### Word (.docx)
-
-| Ferramenta | Descricao |
-|------------|-----------|
-| `create_document` | Criar documento com elementos estruturados |
-| `read_document` | Ler texto e tabelas de documento |
-| `edit_document` | Adicionar elementos a documento existente |
-| `create_document_from_template` | Criar documento a partir de modelo |
-| `create_document_from_example` | Criar documento replicando estilo |
-| `add_image_to_document` | Inserir imagem em documento |
-| `add_table_to_document` | Adicionar tabela formatada |
-| `set_header_footer` | Configurar cabecalho/rodape |
-| `manage_comments` | Gerenciar comentarios |
-| `track_changes` | Aceitar/rejeitar alteracoes |
-| `find_replace_tracked` | Localizar/substituir com tracking |
-| `analyze_document_style` | Extrair informacoes de estilo |
-| `save_style_profile` | Salvar perfil de estilo |
-| `load_style_profile` | Carregar perfil de estilo |
-| `convert_to_pdf` | Converter Word para PDF |
-| `proteger_documento` | Proteger com senha |
-
-### Excel (.xlsx/.xlsm)
+### Word (.docx) — 17 tools
 
 | Ferramenta | Descricao |
 |------------|-----------|
-| `create_spreadsheet` | Criar planilha com multiplas abas |
-| `read_spreadsheet` | Ler dados de aba especifica |
-| `update_spreadsheet` | Atualizar celula com formatacao |
-| `manage_rows_columns` | Inserir/remover linhas e colunas |
-| `merge_cells` | Mesclar/desmesclar celulas |
-| `conditional_formatting` | Aplicar formatacao condicional |
-| `create_chart` | Criar grafico (bar, column, line, pie) |
-| `manage_sheets` | Gerenciar abas |
-| `add_filter` | Adicionar autofiltro |
-| `freeze_panes` | Congelar paineis |
-| `create_pivot_table` | Criar tabela dinamica |
-| `create_dashboard` | Criar dashboard com KPIs |
-| `analyze_spreadsheet_style` | Extrair estilos |
-| `create_spreadsheet_from_example` | Criar replicando estilo |
-| `create_macro_workbook` | Criar arquivo com macros VBA |
-| `run_macro` | Executar macro VBA |
-| `atualizar_power_query` | Atualizar Power Query |
+| `create_document_word` | Criar documento com elementos estruturados |
+| `read_document_word` | Ler texto e tabelas de documento |
+| `edit_document_word` | Editar elemento especifico por posicao |
+| `append_to_document_word` | Adicionar conteudo ao FINAL sem sobrescrever |
+| `get_document_info_word` | Contar paginas, paragrafos, caracteres (SEM modificar) |
+| `create_document_from_template_word` | Criar documento a partir de modelo com substituicao |
+| `create_document_from_example_word` | Criar documento replicando estilo de exemplo |
+| `add_image_to_document_word` | Inserir imagem em documento |
+| `add_table_to_document_word` | Adicionar tabela formatada |
+| `set_header_footer_word` | Configurar cabecalho/rodape com numero de pagina |
+| `manage_comments_word` | Adicionar, listar, responder e remover comentarios |
+| `track_changes_word` | Ativar/desativar controle de alteracoes |
+| `find_replace_tracked_word` | Localizar/substituir com tracking de alteracoes |
+| `analyze_document_style_word` | Extrair fontes, cores e tamanhos do documento |
+| `save_style_profile_word` | Salvar perfil de estilo para reutilizacao |
+| `load_style_profile_word` | Carregar perfil de estilo salvo |
+| `convert_to_pdf_word` | Converter Word para PDF (requer LibreOffice) |
 
-### PowerPoint (.pptx)
-
-| Ferramenta | Descricao |
-|------------|-----------|
-| `create_presentation` | Criar apresentacao |
-| `read_presentation` | Ler estrutura de slides |
-| `add_image_to_slide` | Inserir imagem em slide |
-| `manage_slides` | Gerenciar slides |
-| `change_slide_layout` | Alterar layout do slide |
-| `add_shape` | Adicionar forma geometrica |
-| `add_table_to_slide` | Adicionar tabela a slide |
-| `edit_slide_text` | Editar texto de shape |
-| `add_chart_to_slide` | Adicionar grafico nativo |
-| `add_animation` | Adicionar efeito de animacao |
-| `set_transition` | Configurar transicao |
-| `add_smart_art` | Adicionar SmartArt |
-| `analyze_presentation_style` | Extrair tema e cores |
-| `create_presentation_from_example` | Criar replicando estilo |
-
-### PDF e OCR
+### Excel (.xlsx/.xlsm) — 15 tools
 
 | Ferramenta | Descricao |
 |------------|-----------|
-| `extrair_texto_pdf` | Extrair texto e tabelas de PDF |
-| `ocr_documento` | OCR em imagens de documentos |
+| `create_spreadsheet_excel` | Criar planilha com multiplas abas e formatacao |
+| `read_spreadsheet_excel` | Ler dados de aba especifica |
+| `update_spreadsheet_excel` | Atualizar celula com formatacao |
+| `manage_rows_columns_excel` | Inserir/remover linhas e colunas |
+| `merge_cells_excel` | Mesclar/desmesclar celulas |
+| `conditional_formatting_excel` | Aplicar formatacao condicional |
+| `create_chart_excel` | Criar grafico (bar, column, line, pie, scatter) |
+| `manage_sheets_excel` | Renomear, copiar, mover, deletar abas |
+| `add_filter_excel` | Adicionar autofiltro em colunas |
+| `freeze_panes_excel` | Congelar paineis para navegacao |
+| `atualizar_power_query_excel` | Atualizar queries Power Query |
+| `create_pivot_table_excel` | Criar tabela dinamica com campos |
+| `create_dashboard_excel` | Criar dashboard com KPIs e metricas |
+| `analyze_spreadsheet_style_excel` | Extrair estilos do documento |
+| `create_spreadsheet_from_example_excel` | Criar replicando estilo |
+
+### PowerPoint (.pptx) — 14 tools
+
+| Ferramenta | Descricao |
+|------------|-----------|
+| `create_presentation_pptx` | Criar apresentacao com slides estruturados |
+| `read_presentation_pptx` | Ler estrutura e texto dos slides |
+| `add_image_to_slide_pptx` | Inserir imagem em slide especifico |
+| `manage_slides_pptx` | Adicionar, remover, duplicar, reordenar slides |
+| `change_slide_layout_pptx` | Alterar layout do slide |
+| `add_shape_pptx` | Adicionar forma geometrica com texto |
+| `add_table_to_slide_pptx` | Adicionar tabela a slide |
+| `edit_slide_text_pptx` | Editar texto de shape especifico |
+| `add_chart_to_slide_pptx` | Adicionar grafico nativo PowerPoint |
+| `add_animation_pptx` | Adicionar efeito de animacao a elementos |
+| `set_transition_pptx` | Configurar transicao entre slides |
+| `add_smart_art_pptx` | Adicionar SmartArt (listas, processos, hierarquias) |
+| `analyze_presentation_style_pptx` | Extrair tema, cores e fontes |
+| `create_presentation_from_example_pptx` | Criar replicando estilo |
+
+### VBA — 2 tools
+
+| Ferramenta | Descricao |
+|------------|-----------|
+| `create_macro_workbook_vba` | Criar workbook Excel com macros VBA |
+| `run_macro_vba` | Executar macro VBA em arquivo Excel |
+
+### PDF e OCR — 3 tools
+
+| Ferramenta | Descricao |
+|------------|-----------|
+| `extract_text_pdf` | Extrair texto e tabelas de PDF |
+| `ocr_document` | OCR em imagens de documentos |
+| `protect_document` | Proteger documento com senha |
+
+## Importante: create vs append
+
+| Ferramenta | Comportamento |
+|------------|---------------|
+| `create_document_word` | **SOBRESCREVE** o arquivo inteiro |
+| `append_to_document_word` | **ADICIONA** ao final, preserva tudo |
+| `get_document_info_word` | **NAO modifica** o arquivo (só leitura) |
+
+**Regra de ouro:** Para documentos grandes, use `append_to_document_word` em vez de `create_document_word` para nao perder conteudo.
 
 ## Framework
 
@@ -91,6 +108,10 @@ scripts/office_mcp.py
 pip install openpyxl python-docx python-pptx pywin32 mcp psutil formulas msal pdf2image lxml
 pip install power-pptx excelize dumont docx-revisions PyMuPDF easyocr msoffcrypto-tool pandas
 ```
+
+## Portabilidade
+
+Os caminhos MCP sao **automaticamente corrigidos** a cada execucao do `opencode.bat` ou `opencode.ps1` via `scripts/update_config.js`. Todos os caminhos sao relativos.
 
 ## Uso
 

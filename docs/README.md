@@ -28,10 +28,9 @@ Documentacao sobre launchers, configuracao e sistema de voz.
 
 ## 2. Worktrees
 
-Documentacao sobre multitask agent, plan mode e seletor de projetos.
+Documentacao sobre plan mode e seletor de projetos.
 
 - [Visao Geral](2-worktrees/README.md)
-- [Multitask Agent](2-worktrees/multitask.md)
 - [Plan Mode](2-worktrees/plan-mode.md)
 - [Seletor de Projetos](2-worktrees/projetos.md)
 
@@ -40,7 +39,8 @@ Documentacao sobre multitask agent, plan mode e seletor de projetos.
 Documentacao sobre os servidores MCP (Model Context Protocol).
 
 - [Visao Geral](3-mcp/README.md)
-- [Office MCP](3-mcp/office-mcp.md)
+- [Office MCP](3-mcp/office-mcp.md) — 51 tools (Word, Excel, PPT, PDF)
+- [Brain MCP](3-mcp/brain-mcp.md) — Memoria portatil com busca vetorial
 - [Project MCP](3-mcp/project-mcp.md)
 - [Configuracao MCP](3-mcp/configuracao.md)
 
@@ -50,7 +50,6 @@ Documentacao sobre os plugins do OpenCode.
 
 - [Visao Geral](4-plugins/README.md)
 - [Voice Plugin](4-plugins/voice-plugin.md)
-- [Multitask Plugin](4-plugins/multitask-plugin.md)
 - [Workspace Plugin](4-plugins/workspace-plugin.md)
 - [Auto-Switch Plugin](4-plugins/auto-switch-plugin.md)
 

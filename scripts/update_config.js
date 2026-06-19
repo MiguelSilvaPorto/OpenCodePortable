@@ -6,6 +6,7 @@ const configPath = path.join(home, 'config', 'opencode.jsonc');
 
 const officeMcp = path.join(home, 'scripts', 'office_mcp.py').replace(/\\/g, '/');
 const projectMcp = path.join(home, 'scripts', 'project_generator.py').replace(/\\/g, '/');
+const brainMcp = path.join(home, '.brain', 'scripts', 'brain_mcp.py').replace(/\\/g, '/');
 
 let cfg = null;
 let fileExists = false;
@@ -43,8 +44,6 @@ if (!cfg) {
                 "@renjfk/opencode-voice",
                 defaultVoiceCfg
             ],
-            "multitask",
-            "multitask-tui.tsx",
             "workspace-tui.tsx",
             "auto-switch-mode.ts"
         ],
@@ -57,6 +56,11 @@ if (!cfg) {
             "project-mcp": {
                 type: "local",
                 command: ["python", projectMcp],
+                enabled: true
+            },
+            "brain-mcp": {
+                type: "local",
+                command: ["python", brainMcp],
                 enabled: true
             }
         }
@@ -75,6 +79,12 @@ if (!cfg) {
         cfg.mcp["project-mcp"] = { type: "local", command: ["python", projectMcp], enabled: true };
     } else {
         cfg.mcp["project-mcp"].command = ["python", projectMcp];
+    }
+
+    if (!cfg.mcp["brain-mcp"]) {
+        cfg.mcp["brain-mcp"] = { type: "local", command: ["python", brainMcp], enabled: true };
+    } else {
+        cfg.mcp["brain-mcp"].command = ["python", brainMcp];
     }
 
     // Migrar plugin se GROQ_API_KEY estiver disponível
