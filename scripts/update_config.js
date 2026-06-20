@@ -8,6 +8,7 @@ const officeMcp = path.join(home, 'scripts', 'office_mcp.py').replace(/\\/g, '/'
 const projectMcp = path.join(home, 'scripts', 'project_generator.py').replace(/\\/g, '/');
 const brainMcp = path.join(home, '.brain', 'scripts', 'brain_mcp.py').replace(/\\/g, '/');
 const skillMcp = path.join(home, '.brain', 'scripts', 'skill_mcp.py').replace(/\\/g, '/');
+const webSearchMcp = path.join(home, 'scripts', 'web_search_mcp.py').replace(/\\/g, '/');
 
 let cfg = null;
 let fileExists = false;
@@ -68,6 +69,11 @@ if (!cfg) {
                 type: "local",
                 command: ["python", skillMcp],
                 enabled: true
+            },
+            "web-search-mcp": {
+                type: "local",
+                command: ["python", webSearchMcp],
+                enabled: true
             }
         }
     };
@@ -97,6 +103,12 @@ if (!cfg) {
         cfg.mcp["skill-mcp"] = { type: "local", command: ["python", skillMcp], enabled: true };
     } else {
         cfg.mcp["skill-mcp"].command = ["python", skillMcp];
+    }
+
+    if (!cfg.mcp["web-search-mcp"]) {
+        cfg.mcp["web-search-mcp"] = { type: "local", command: ["python", webSearchMcp], enabled: true };
+    } else {
+        cfg.mcp["web-search-mcp"].command = ["python", webSearchMcp];
     }
 
     // Migrar plugin se GROQ_API_KEY estiver disponível

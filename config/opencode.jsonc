@@ -89,7 +89,7 @@
             "type": "local",
             "command": [
                 "python",
-                "D:/Miguel/Github/OpenCodePortable/scripts/office_mcp.py"
+                "D:/Github/OpenCodePortable/scripts/office_mcp.py"
             ],
             "enabled": true
         },
@@ -97,7 +97,7 @@
             "type": "local",
             "command": [
                 "python",
-                "D:/Miguel/Github/OpenCodePortable/scripts/project_generator.py"
+                "D:/Github/OpenCodePortable/scripts/project_generator.py"
             ],
             "enabled": true
         },
@@ -105,7 +105,7 @@
             "type": "local",
             "command": [
                 "python",
-                "D:/Miguel/Github/OpenCodePortable/.brain/scripts/brain_mcp.py"
+                "D:/Github/OpenCodePortable/.brain/scripts/brain_mcp.py"
             ],
             "enabled": true
         },
@@ -113,7 +113,7 @@
             "type": "local",
             "command": [
                 "python",
-                "D:/Miguel/Github/OpenCodePortable/.brain/scripts/skill_mcp.py"
+                "D:/Github/OpenCodePortable/.brain/scripts/skill_mcp.py"
             ],
             "enabled": true
         },
@@ -121,7 +121,7 @@
             "type": "local",
             "command": [
                 "python",
-                "D:/Miguel/Github/OpenCodePortable/scripts/web_search_mcp.py"
+                "D:/Github/OpenCodePortable/scripts/web_search_mcp.py"
             ],
             "enabled": true
         }
