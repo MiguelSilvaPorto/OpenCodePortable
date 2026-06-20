@@ -279,13 +279,19 @@ function Run-InitialSetup {
             check = { $null -ne (Get-Command scoop -ErrorAction SilentlyContinue) }
             install = {
                 Write-Host "  Instalando Scoop (gerenciador de pacotes)..." -ForegroundColor Gray
+                Write-Host "    Se falhar, as dependencias de voz (whisper, sox) nao serao instaladas." -ForegroundColor Gray
                 try {
                     Set-ExecutionPolicy RemoteSigned -Scope CurrentUser -Force 2>$null
                     [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+                    # Metodo 1: Instalacao via PowerShell
                     powershell -NoProfile -ExecutionPolicy Bypass -Command "Invoke-RestMethod -Uri https://get.scoop.sh | Invoke-Expression" 2>$null
                 } catch {
-                    Write-Host "  [AVISO] Falha ao instalar Scoop: $($_.Exception.Message)" -ForegroundColor Yellow
-                    Write-Host "  Dependencias de voz (whisper, sox) nao serao instaladas." -ForegroundColor Yellow
+                    Write-Host "  [INFO] Scoop nao instalado (voz desativada). Continuando..." -ForegroundColor Gray
+                }
+                # Verificar se instalou
+                if (-not (Get-Command scoop -ErrorAction SilentlyContinue)) {
+                    Write-Host "  [INFO] Para usar entrada de voz, instale Scoop manualmente:" -ForegroundColor Gray
+                    Write-Host "    powershell -Command `"Invoke-RestMethod get.scoop.sh | Invoke-Expression`"" -ForegroundColor Gray
                 }
             }
         },
@@ -336,16 +342,20 @@ function Run-InitialSetup {
             check = { $null -ne (Get-Command node -ErrorAction SilentlyContinue) }
             install = {
                 Write-Host "  Instalando Node.js (necessario para scripts de configuracao)..." -ForegroundColor Gray
-                $scoop = Get-Command scoop -ErrorAction SilentlyContinue
-                if ($scoop) {
-                    scoop install nodejs 2>$null
+                # Prioridade: winget (mais confiavel) > Scoop > fallback manual
+                $winget = Get-Command winget -ErrorAction SilentlyContinue
+                if ($winget) {
+                    Write-Host "    Usando winget (gerenciador nativo do Windows)..." -ForegroundColor Gray
+                    & winget install OpenJS.NodeJS --silent --accept-package-agreements 2>$null
                 } else {
-                    # Fallback: winget (nativo do Windows 10/11)
-                    $winget = Get-Command winget -ErrorAction SilentlyContinue
-                    if ($winget) {
-                        winget install OpenJS.NodeJS 2>$null
+                    $scoop = Get-Command scoop -ErrorAction SilentlyContinue
+                    if ($scoop) {
+                        Write-Host "    Usando Scoop..." -ForegroundColor Gray
+                        & scoop install nodejs 2>$null
                     } else {
-                        Write-Host "  [AVISO] Node.js nao instalado. Baixe manualmente em https://nodejs.org" -ForegroundColor Yellow
+                        Write-Host "  [AVISO] Nao foi possivel instalar Node.js automaticamente." -ForegroundColor Yellow
+                        Write-Host "  Baixe manualmente em: https://nodejs.org" -ForegroundColor Yellow
+                        Write-Host "  Apos instalar, execute novamente." -ForegroundColor Yellow
                     }
                 }
             }
