@@ -412,13 +412,36 @@ function Run-InitialSetup {
                     Write-Host "    Baixando Node.js..." -ForegroundColor Gray
                     Invoke-WebRequest -Uri $nodeUrl -OutFile $installerPath -UseBasicParsing -TimeoutSec 180
                     
-                    if ((Test-Path $installerPath) -and ((Get-Item $installerPath).Length -gt 10MB)) {
+                    if (Test-Path $installerPath) {
                         Write-Host "    Instalando Node.js (aguarde)..." -ForegroundColor Gray
                         $proc = Start-Process msiexec -ArgumentList "/i `"$installerPath`" /quiet /norestart" -Wait -PassThru
-                        if ($proc.ExitCode -eq 0 -or $proc.ExitCode -eq 3010) {
-                            # Refresh PATH
+                        Write-Host "    Codigo de instalacao: $($proc.ExitCode)" -ForegroundColor Gray
+                        
+                        # Procurar node.exe em locais comuns (mesmo que o PATH nao tenha atualizado)
+                        $nodePaths = @(
+                            "$env:ProgramFiles\nodejs\node.exe",
+                            "${env:ProgramFiles(x86)}\nodejs\node.exe",
+                            "$env:LOCALAPPDATA\Programs\nodejs\node.exe",
+                            "$env:APPDATA\npm\node.exe"
+                        )
+                        $foundNode = $null
+                        foreach ($p in $nodePaths) {
+                            if (Test-Path $p) { $foundNode = $p; break }
+                        }
+                        
+                        if ($foundNode) {
+                            # Adicionar ao PATH manualmente
+                            $nodeDir = Split-Path $foundNode -Parent
+                            $env:Path = "$nodeDir;$env:Path"
+                            $nodeInstalled = $true
+                            Write-Host "    Node.js encontrado em: $nodeDir" -ForegroundColor Green
+                        } else {
+                            # Tentar via PATH normal
                             $env:Path = [Environment]::GetEnvironmentVariable("Path", "Machine") + ";" + [Environment]::GetEnvironmentVariable("Path", "User")
                             $nodeInstalled = $null -ne (Get-Command node -ErrorAction SilentlyContinue)
+                            if (-not $nodeInstalled) {
+                                Write-Host "    [INFO] Node.js pode ter sido instalado mas nao esta no PATH." -ForegroundColor Yellow
+                            }
                         }
                     }
                 } catch {
