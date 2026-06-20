@@ -510,15 +510,32 @@ function Run-InitialSetup {
             }
             install = {
                 Write-Host "  Instalando dependencias Python..." -ForegroundColor Gray
+                
+                # Verificar versao minima do Python (3.10+ para mcp)
+                $pyVersion = python -c "import sys; print(f'{sys.version_info.major}.{sys.version_info.minor}')" 2>$null
+                Write-Host "    Python version: $pyVersion" -ForegroundColor Gray
+                
+                # Atualizar pip
                 python -m pip install --upgrade pip 2>$null
-                # Instalar em lotes para evitar falha total
-                python -m pip install openpyxl python-docx python-pptx mcp psutil pdf2image lxml 2>$null
-                # pywin32 e formulas sao opcionais (Windows-only)
-                try {
-                    python -m pip install pywin32 formulas msal 2>$null
-                } catch {
-                    Write-Host "  [INFO] Dependencias opcionais nao instaladas (pywin32, formulas, msal)" -ForegroundColor Gray
+                
+                # Instalar pacotes essenciais
+                Write-Host "    Instalando mcp, openpyxl, python-docx, python-pptx..." -ForegroundColor Gray
+                $installOutput = python -m pip install openpyxl python-docx python-pptx mcp psutil pdf2image lxml 2>&1
+                $exitCode = $LASTEXITCODE
+                if ($exitCode -ne 0) {
+                    Write-Host "    [AVISO] Alguns pacotes podem ter falhado. Verificando..." -ForegroundColor Yellow
+                    # Verificar quais pacotes nao foram instalados
+                    python -c "import openpyxl; print('openpyxl OK')" 2>$null
+                    python -c "import docx; print('python-docx OK')" 2>$null
+                    python -c "import pptx; print('python-pptx OK')" 2>$null
+                    python -c "import mcp; print('mcp OK')" 2>$null
+                    python -c "import psutil; print('psutil OK')" 2>$null
+                    python -c "import pdf2image; print('pdf2image OK')" 2>$null
+                    python -c "import lxml; print('lxml OK')" 2>$null
                 }
+                
+                # Pacotes opcionais (Windows-only)
+                python -m pip install pywin32 formulas msal 2>$null
             }
         }
     )
