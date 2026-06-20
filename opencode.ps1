@@ -341,7 +341,6 @@ function Download-OpenCodeExe {
 function Run-InitialSetup {
     $configFile = Join-Path $OPENCODE_CONFIG "opencode.jsonc"
     $nodeInstalled = $null -ne (Get-Command node -ErrorAction SilentlyContinue)
-    $pythonInstalled = $null -ne (Get-Command python -ErrorAction SilentlyContinue)
     if ((Test-Path $FIRST_RUN_MARKER) -and (Test-Path $configFile) -and $nodeInstalled) {
         Write-Log "SETUP" "SKIPPED" @{ reason = "Todos os componentes ja instalados"; marker = $FIRST_RUN_MARKER }
         return $true
