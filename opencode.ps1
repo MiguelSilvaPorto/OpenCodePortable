@@ -470,7 +470,6 @@ function Update-OpenCodeConfig {
         Write-Log "CONFIG" "UPDATED" @{ file = $configFile }
     } elseif (-not $node) {
         Write-Log "CONFIG" "NODE_MISSING" @{ hint = "Node.js sera instalado na proxima execucao do setup" } "WARN"
-    }
     } else {
         Write-Error "[CONFIG] update_config.js nao encontrado"
     }
