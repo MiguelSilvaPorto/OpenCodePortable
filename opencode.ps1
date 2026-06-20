@@ -337,88 +337,68 @@ function Run-InitialSetup {
         @{
             name = "PYTHON"
             check = {
-                # Verificar se python e o Python REAL (nao atalho do Microsoft Store)
-                $py = Get-Command python -ErrorAction SilentlyContinue
-                if (-not $py) { return $false }
                 try {
                     $ver = & python --version 2>&1
-                    if ($ver -match "^Python\s+\d") { return $true }
-                    # Se python respondeu mas nao e "Python X.Y", e atalho do Store
-                    return $false
+                    return ($ver -match "^Python\s+\d")
                 } catch {
                     return $false
                 }
             }
             install = {
-                Write-Host "  Instalando Python (necessario para MCPs e ferramentas)..." -ForegroundColor Gray
+                Write-Host "  Instalando Python 3.12 (necessario para MCPs)..." -ForegroundColor Gray
 
-                # Verificar se atalho do Store existe e tentar desabilitar
-                $storeAlias = "$env:LOCALAPPDATA\Microsoft\WindowsApps\python.exe"
-                if (Test-Path $storeAlias) {
-                    Write-Host "    Detectado atalho do Microsoft Store. Tentando bypass..." -ForegroundColor Yellow
-                    # Tentar desabilitar o alias do Store
-                    try {
-                        $aliasPath = "$env:LOCALAPPDATA\Microsoft\WindowsApps"
-                        $aliasFiles = Get-ChildItem -Path $aliasPath -Filter "python*.exe" -ErrorAction SilentlyContinue
-                        foreach ($f in $aliasFiles) {
-                            $realPath = (Get-Item $f.FullName).Target
-                            if ($realPath -and (Test-Path $realPath)) {
-                                $env:Path = "$realPath;$env:Path"
-                            }
-                        }
-                    } catch {}
-                }
-
-                # Metodo 1: winget (resolve o alias do Store automaticamente)
+                # Metodo 1: winget
                 $winget = Get-Command winget -ErrorAction SilentlyContinue
                 if ($winget) {
-                    Write-Host "    Instalando via winget..." -ForegroundColor Gray
+                    Write-Host "    Metodo 1: winget..." -ForegroundColor Gray
                     & winget install Python.Python.3.12 --silent --accept-package-agreements --accept-source-agreements 2>$null
-                    # Atualizar PATH para incluir novo Python
                     $env:Path = [Environment]::GetEnvironmentVariable("Path", "Machine") + ";" + [Environment]::GetEnvironmentVariable("Path", "User")
-                }
-                
-                # Metodo 2: Download direto do python.org (se winget falhou)
-                $pyCheck = & python --version 2>&1
-                if (-not ($pyCheck -match "^Python\s+\d")) {
-                    Write-Host "    Instalando via download direto..." -ForegroundColor Gray
-                    try {
-                        $installerDir = Join-Path $OPENCODE_DATA "installers"
-                        if (-not (Test-Path $installerDir)) { New-Item -ItemType Directory -Path $installerDir -Force | Out-Null }
-                        $pyUrl = "https://www.python.org/ftp/python/3.12.10/python-3.12.10-amd64.exe"
-                        $pyPath = Join-Path $installerDir "python-installer.exe"
-                        [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
-                        Invoke-WebRequest -Uri $pyUrl -OutFile $pyPath -UseBasicParsing -TimeoutSec 180
-                        if (Test-Path $pyPath) {
-                            Write-Host "    Executando instalador Python (aguarde)..." -ForegroundColor Gray
-                            $proc = Start-Process -FilePath $pyPath -ArgumentList "/quiet InstallAllUsers=0 PrependPath=1 Include_test=0" -Wait -PassThru
-                            # Refresh PATH apos instalacao
-                            $env:Path = [Environment]::GetEnvironmentVariable("Path", "Machine") + ";" + [Environment]::GetEnvironmentVariable("Path", "User")
-                        }
-                    } catch {
-                        Write-Host "  [AVISO] Falha ao instalar Python." -ForegroundColor Yellow
+                    $installed = & python --version 2>&1
+                    if ($installed -match "^Python\s+\d") {
+                        Write-Host "    Python OK: $installed" -ForegroundColor Green
+                        return
                     }
                 }
-                
-                # Metodo 3: Scoop (ultimo recurso)
-                $pyCheck2 = & python --version 2>&1
-                if (-not ($pyCheck2 -match "^Python\s+\d")) {
+
+                # Metodo 2: Download direto python.org (instalador com UI)
+                Write-Host "    Metodo 2: Download python.org..." -ForegroundColor Gray
+                try {
+                    $installerDir = Join-Path $OPENCODE_DATA "installers"
+                    if (-not (Test-Path $installerDir)) { New-Item -ItemType Directory -Path $installerDir -Force | Out-Null }
+                    $pyPath = Join-Path $installerDir "python-installer.exe"
+                    [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+                    $pyUrl = "https://www.python.org/ftp/python/3.12.8/python-3.12.8-amd64.exe"
+                    Invoke-WebRequest -Uri $pyUrl -OutFile $pyPath -UseBasicParsing -TimeoutSec 180
+                    if (Test-Path $pyPath) {
+                        Write-Host "    Abrindo instalador Python (complete a instalacao)..." -ForegroundColor Yellow
+                        Start-Process -FilePath $pyPath -Wait
+                        $env:Path = [Environment]::GetEnvironmentVariable("Path", "Machine") + ";" + [Environment]::GetEnvironmentVariable("Path", "User")
+                    }
+                } catch {
+                    Write-Host "    [AVISO] Download falhou: $($_.Exception.Message)" -ForegroundColor Yellow
+                }
+
+                # Metodo 3: Scoop
+                $final = & python --version 2>&1
+                if (-not ($final -match "^Python\s+\d")) {
                     $scoop = Get-Command scoop -ErrorAction SilentlyContinue
                     if ($scoop) {
-                        Write-Host "    Instalando via Scoop..." -ForegroundColor Gray
+                        Write-Host "    Metodo 3: Scoop..." -ForegroundColor Gray
                         & scoop install python 2>$null
                         $env:Path = [Environment]::GetEnvironmentVariable("Path", "Machine") + ";" + [Environment]::GetEnvironmentVariable("Path", "User")
                     }
                 }
-                
+
                 # Verificacao final
-                $pyFinal = & python --version 2>&1
-                if ($pyFinal -match "^Python\s+\d") {
-                    Write-Host "    Python instalado: $pyFinal" -ForegroundColor Green
+                $final = & python --version 2>&1
+                if ($final -match "^Python\s+\d") {
+                    Write-Host "    Python OK: $final" -ForegroundColor Green
                 } else {
-                    Write-Host "  [AVISO] Python nao instalado. O setup continuara sem Python." -ForegroundColor Yellow
+                    Write-Host ""
+                    Write-Host "  [AVISO] Python NAO foi instalado." -ForegroundColor Yellow
                     Write-Host "  Instale manualmente: https://www.python.org/downloads/" -ForegroundColor Yellow
-                    Write-Host "  (Marque 'Add Python to PATH' durante a instalacao)" -ForegroundColor Yellow
+                    Write-Host "  IMPORTANTE: Marque 'Add Python to PATH' durante a instalacao!" -ForegroundColor Yellow
+                    Write-Host ""
                 }
             }
         },
