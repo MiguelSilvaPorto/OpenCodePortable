@@ -378,55 +378,89 @@ function Run-InitialSetup {
                 Write-Host "  Instalando Node.js (necessario para scripts de configuracao)..." -ForegroundColor Gray
                 $nodeInstalled = $false
                 
-                # Metodo 1: winget (com timeout de 120s)
-                $winget = Get-Command winget -ErrorAction SilentlyContinue
-                if ($winget) {
-                    Write-Host "    Metodo 1: winget (timeout 120s)..." -ForegroundColor Gray
-                    $wingetJob = Start-Job -ScriptBlock { param($a) & winget install OpenJS.NodeJS --silent --accept-package-agreements 2>$null } -ArgumentList $null
-                    $wingetResult = Wait-Job -Job $wingetJob -Timeout 120
-                    if (-not $wingetResult) {
-                        Stop-Job -Job $wingetJob
-                        Write-Host "    [INFO] winget excedeu o tempo limite. Continuando..." -ForegroundColor Gray
+                # Metodo 1: Download direto do Node.js (mais confiavel)
+                Write-Host "    Metodo 1: Download direto nodejs.org..." -ForegroundColor Gray
+                try {
+                    $installerDir = Join-Path $OPENCODE_DATA "installers"
+                    if (-not (Test-Path $installerDir)) { New-Item -ItemType Directory -Path $installerDir -Force | Out-Null }
+                    $installerPath = Join-Path $installerDir "node-installer.msi"
+                    
+                    # Detectar arquitetura: x86 ou x64
+                    $arch = "x64"
+                    if ([Environment]::Is64BitOperatingSystem -eq $false) { $arch = "x86" }
+                    
+                    Write-Host "    Detectando ultima versao do Node.js..." -ForegroundColor Gray
+                    [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+                    
+                    # Buscar ultima versao via API do nodejs.org
+                    try {
+                        $versions = Invoke-RestMethod -Uri "https://nodejs.org/dist/index.json" -UseBasicParsing -TimeoutSec 15
+                        $latestLTS = $versions | Where-Object { $_.lts -ne $false } | Select-Object -First 1
+                        if ($latestLTS) {
+                            $nodeVersion = $latestLTS.version
+                            $nodeUrl = "https://nodejs.org/dist/$nodeVersion/node-$nodeVersion-$arch.msi"
+                            Write-Host "    Versao LTS: $nodeVersion" -ForegroundColor Gray
+                        } else {
+                            throw "API nao retornou versoes"
+                        }
+                    } catch {
+                        # Fallback: versao fixa
+                        $nodeUrl = "https://nodejs.org/dist/v22.14.0/node-v22.14.0-$arch.msi"
+                        Write-Host "    Usando versao fixa v22.14.0" -ForegroundColor Gray
                     }
-                    Remove-Job -Job $wingetJob -ErrorAction SilentlyContinue
-                    $nodeInstalled = $null -ne (Get-Command node -ErrorAction SilentlyContinue)
+                    
+                    Write-Host "    Baixando Node.js..." -ForegroundColor Gray
+                    Invoke-WebRequest -Uri $nodeUrl -OutFile $installerPath -UseBasicParsing -TimeoutSec 180
+                    
+                    if ((Test-Path $installerPath) -and ((Get-Item $installerPath).Length -gt 10MB)) {
+                        Write-Host "    Instalando Node.js (aguarde)..." -ForegroundColor Gray
+                        $proc = Start-Process msiexec -ArgumentList "/i `"$installerPath`" /quiet /norestart" -Wait -PassThru
+                        if ($proc.ExitCode -eq 0 -or $proc.ExitCode -eq 3010) {
+                            # Refresh PATH
+                            $env:Path = [Environment]::GetEnvironmentVariable("Path", "Machine") + ";" + [Environment]::GetEnvironmentVariable("Path", "User")
+                            $nodeInstalled = $null -ne (Get-Command node -ErrorAction SilentlyContinue)
+                        }
+                    }
+                } catch {
+                    Write-Host "    [INFO] Download direto falhou: $($_.Exception.Message)" -ForegroundColor Gray
                 }
                 
-                # Metodo 2: Scoop
+                # Metodo 2: winget (se metodo 1 falhou)
+                if (-not $nodeInstalled) {
+                    $winget = Get-Command winget -ErrorAction SilentlyContinue
+                    if ($winget) {
+                        Write-Host "    Metodo 2: winget (timeout 60s)..." -ForegroundColor Gray
+                        try {
+                            $wingetJob = Start-Job -ScriptBlock { & winget install OpenJS.NodeJS --silent --accept-package-agreements 2>$null }
+                            $wingetResult = Wait-Job -Job $wingetJob -Timeout 60
+                            if (-not $wingetResult) {
+                                Stop-Job -Job $wingetJob
+                                Write-Host "    [INFO] winget excedeu o tempo limite." -ForegroundColor Gray
+                            }
+                            Remove-Job -Job $wingetJob -ErrorAction SilentlyContinue
+                            $env:Path = [Environment]::GetEnvironmentVariable("Path", "Machine") + ";" + [Environment]::GetEnvironmentVariable("Path", "User")
+                            $nodeInstalled = $null -ne (Get-Command node -ErrorAction SilentlyContinue)
+                        } catch {
+                            Write-Host "    [INFO] winget falhou." -ForegroundColor Gray
+                        }
+                    }
+                }
+                
+                # Metodo 3: Scoop (ultimo recurso)
                 if (-not $nodeInstalled) {
                     $scoop = Get-Command scoop -ErrorAction SilentlyContinue
                     if ($scoop) {
-                        Write-Host "    Metodo 2: Scoop..." -ForegroundColor Gray
+                        Write-Host "    Metodo 3: Scoop..." -ForegroundColor Gray
                         & scoop install nodejs 2>$null
+                        $env:Path = [Environment]::GetEnvironmentVariable("Path", "Machine") + ";" + [Environment]::GetEnvironmentVariable("Path", "User")
                         $nodeInstalled = $null -ne (Get-Command node -ErrorAction SilentlyContinue)
                     }
                 }
                 
-                # Metodo 3: Download direto do Node.js
-                if (-not $nodeInstalled) {
-                    Write-Host "    Metodo 3: Download direto do Node.js..." -ForegroundColor Gray
-                    try {
-                        $installerDir = Join-Path $OPENCODE_DATA "installers"
-                        if (-not (Test-Path $installerDir)) { New-Item -ItemType Directory -Path $installerDir -Force | Out-Null }
-                        $installerPath = Join-Path $installerDir "node-installer.msi"
-                        $nodeUrl = "https://nodejs.org/dist/latest/node-v22.x86.msi"
-                        Write-Host "    Baixando Node.js (via nodejs.org)..." -ForegroundColor Gray
-                        [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
-                        Invoke-WebRequest -Uri $nodeUrl -OutFile $installerPath -UseBasicParsing -TimeoutSec 120
-                        if (Test-Path $installerPath) {
-                            Write-Host "    Instalando Node.js..." -ForegroundColor Gray
-                            Start-Process msiexec -ArgumentList "/i `"$installerPath`" /quiet /norestart" -Wait
-                            $nodeInstalled = $null -ne (Get-Command node -ErrorAction SilentlyContinue)
-                        }
-                    } catch {
-                        Write-Host "    [INFO] Download direto falhou: $($_.Exception.Message)" -ForegroundColor Gray
-                    }
-                }
-                
-                if (-not $nodeInstalled) {
-                    Write-Host "  [INFO] Node.js nao instalado automaticamente." -ForegroundColor Yellow
-                    Write-Host "  Baixe manualmente em: https://nodejs.org" -ForegroundColor Yellow
-                    Write-Host "  (Necessario para configuracao de caminhos MCP)" -ForegroundColor Yellow
+                if ($nodeInstalled) {
+                    Write-Host "    Node.js instalado com sucesso!" -ForegroundColor Green
+                } else {
+                    Write-Host "  [INFO] Node.js nao instalado automaticamente. Baixe em: https://nodejs.org" -ForegroundColor Yellow
                 }
             }
         },
