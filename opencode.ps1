@@ -337,7 +337,6 @@ function Run-InitialSetup {
         @{
             name = "PYTHON"
             check = {
-                # Triple-check: versao valida + executavel real + nao e Store alias
                 try {
                     $ver = & python --version 2>&1
                     if (-not ($ver -match "^Python\s+\d")) { return $false }
@@ -351,37 +350,19 @@ function Run-InitialSetup {
             install = {
                 Write-Host "  [PYTHON] Instalando Python 3.12..." -ForegroundColor Cyan
 
-                # Metodo 1: winget (silencioso com UAC)
-                $winget = Get-Command winget -ErrorAction SilentlyContinue
-                if ($winget) {
-                    Write-Host "  [PYTHON] Via winget..." -ForegroundColor Gray
-                    $pyJob = Start-Job -ScriptBlock { & winget install Python.Python.3.12 --silent --accept-package-agreements --accept-source-agreements 2>$null }
-                    $pyResult = Wait-Job -Job $pyJob -Timeout 300
-                    if (-not $pyResult) {
-                        Stop-Job -Job $pyJob
-                        Write-Host "  [PYTHON] winget timeout." -ForegroundColor Yellow
-                    }
-                    Remove-Job -Job $pyJob -ErrorAction SilentlyContinue
-                    $env:Path = [Environment]::GetEnvironmentVariable("Path", "Machine") + ";" + [Environment]::GetEnvironmentVariable("Path", "User")
-                    $ver = & python --version 2>&1
-                    if ($ver -match "^Python\s+\d") {
-                        Write-Host "  [PYTHON] OK: $ver" -ForegroundColor Green
-                        return
-                    }
-                    Write-Host "  [PYTHON] winget falhou, tentando download..." -ForegroundColor Yellow
-                }
-
-                # Metodo 2: Download direto
-                Write-Host "  [PYTHON] Download python.org..." -ForegroundColor Gray
+                # Metodo 1: Download direto (silencioso com admin)
                 try {
                     $installerDir = Join-Path $OPENCODE_DATA "installers"
                     if (-not (Test-Path $installerDir)) { New-Item -ItemType Directory -Path $installerDir -Force | Out-Null }
                     $pyPath = Join-Path $installerDir "python-installer.exe"
-                    [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
-                    Invoke-WebRequest -Uri "https://www.python.org/ftp/python/3.12.8/python-3.12.8-amd64.exe" -OutFile $pyPath -UseBasicParsing -TimeoutSec 180
+                    if (-not (Test-Path $pyPath)) {
+                        [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+                        Write-Host "  [PYTHON] Baixando Python 3.12.8..." -ForegroundColor Gray
+                        Invoke-WebRequest -Uri "https://www.python.org/ftp/python/3.12.8/python-3.12.8-amd64.exe" -OutFile $pyPath -UseBasicParsing -TimeoutSec 180
+                    }
                     if (Test-Path $pyPath) {
-                        Write-Host "  [PYTHON] Instalando silencioso..." -ForegroundColor Gray
-                        Start-Process -FilePath $pyPath -ArgumentList "/quiet InstallAllUsers=0 PrependPath=1 Include_test=0" -Wait -Verb RunAs
+                        Write-Host "  [PYTHON] Instalando com privilegios admin..." -ForegroundColor Gray
+                        Start-Process -FilePath "powershell.exe" -ArgumentList "-NoProfile -ExecutionPolicy Bypass -Command `"& '$pyPath' /quiet InstallAllUsers=0 PrependPath=1 Include_test=0`"" -Verb RunAs -Wait
                         $env:Path = [Environment]::GetEnvironmentVariable("Path", "Machine") + ";" + [Environment]::GetEnvironmentVariable("Path", "User")
                         $pyPaths = @(
                             "$env:LOCALAPPDATA\Programs\Python\Python312\python.exe",
@@ -396,7 +377,7 @@ function Run-InitialSetup {
                         }
                     }
                 } catch {
-                    Write-Host "  [PYTHON] Download falhou: $($_.Exception.Message)" -ForegroundColor Yellow
+                    Write-Host "  [PYTHON] Falha: $($_.Exception.Message)" -ForegroundColor Yellow
                 }
 
                 # Verificacao final
