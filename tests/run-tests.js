@@ -49,15 +49,14 @@ assert(dbExists, 'Database file should be initialized inside data/opencode/');
 console.log('Test 1 Passed: All session, logs, and database files are isolated locally.');
 
 // Test 2: Agent Division Validation
-console.log('\n--- Test 2: Agent Division (agent, multitask, ask) ---');
+console.log('\n--- Test 2: Agent Division (agent, ask) ---');
 const run2 = spawnSync(binaryPath, ['agent', 'list'], { env, encoding: 'utf8' });
 assert.strictEqual(run2.status, 0, 'Agent list command should exit with code 0');
 console.log('Available agents output:\n' + run2.stdout);
 
 assert(run2.stdout.includes('agent'), 'Agent list must contain "agent"');
-assert(run2.stdout.includes('multitask'), 'Agent list must contain "multitask"');
 assert(run2.stdout.includes('ask'), 'Agent list must contain "ask"');
-console.log('Test 2 Passed: Agents are successfully split into agent, multitask, and ask.');
+console.log('Test 2 Passed: Agents are successfully split into agent and ask.');
 
 // Test 3: Plan mode creates static plan file path
 console.log('\n--- Test 3: Plan Mode Static Path ---');

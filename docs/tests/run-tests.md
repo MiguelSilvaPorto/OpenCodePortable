@@ -30,7 +30,7 @@ Verifica que os agents estao disponiveis.
 
 ```
 - Roda: opencode.exe agent list
-- Verifica: "agent", "multitask", "ask" na saida
+- Verifica: "agent", "ask" na saida
 - Resultado: Agents divididos corretamente
 ```
 
