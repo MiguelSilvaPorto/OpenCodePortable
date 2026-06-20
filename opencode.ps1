@@ -345,61 +345,48 @@ function Run-InitialSetup {
                 }
             }
             install = {
-                Write-Host "  Instalando Python 3.12 (necessario para MCPs)..." -ForegroundColor Gray
+                Write-Host "  [PYTHON] Instalando Python..." -ForegroundColor Cyan
+                Write-Host "  O instalador vai abrir. Marque 'Add Python to PATH' e clique 'Install Now'." -ForegroundColor Yellow
+                Write-Host ""
 
-                # Metodo 1: winget
-                $winget = Get-Command winget -ErrorAction SilentlyContinue
-                if ($winget) {
-                    Write-Host "    Metodo 1: winget..." -ForegroundColor Gray
-                    & winget install Python.Python.3.12 --silent --accept-package-agreements --accept-source-agreements 2>$null
-                    $env:Path = [Environment]::GetEnvironmentVariable("Path", "Machine") + ";" + [Environment]::GetEnvironmentVariable("Path", "User")
-                    $installed = & python --version 2>&1
-                    if ($installed -match "^Python\s+\d") {
-                        Write-Host "    Python OK: $installed" -ForegroundColor Green
-                        return
-                    }
-                }
+                # Download do instalador Python
+                $installerDir = Join-Path $OPENCODE_DATA "installers"
+                if (-not (Test-Path $installerDir)) { New-Item -ItemType Directory -Path $installerDir -Force | Out-Null }
+                $pyPath = Join-Path $installerDir "python-installer.exe"
 
-                # Metodo 2: Download direto python.org (instalador com UI)
-                Write-Host "    Metodo 2: Download python.org..." -ForegroundColor Gray
-                try {
-                    $installerDir = Join-Path $OPENCODE_DATA "installers"
-                    if (-not (Test-Path $installerDir)) { New-Item -ItemType Directory -Path $installerDir -Force | Out-Null }
-                    $pyPath = Join-Path $installerDir "python-installer.exe"
+                # Verificar se ja existe um instalador baixado
+                if (-not (Test-Path $pyPath)) {
                     [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
-                    $pyUrl = "https://www.python.org/ftp/python/3.12.8/python-3.12.8-amd64.exe"
-                    Invoke-WebRequest -Uri $pyUrl -OutFile $pyPath -UseBasicParsing -TimeoutSec 180
-                    if (Test-Path $pyPath) {
-                        Write-Host "    Abrindo instalador Python (complete a instalacao)..." -ForegroundColor Yellow
-                        Start-Process -FilePath $pyPath -Wait
-                        $env:Path = [Environment]::GetEnvironmentVariable("Path", "Machine") + ";" + [Environment]::GetEnvironmentVariable("Path", "User")
-                    }
-                } catch {
-                    Write-Host "    [AVISO] Download falhou: $($_.Exception.Message)" -ForegroundColor Yellow
+                    Write-Host "  [PYTHON] Baixando Python 3.12.8..." -ForegroundColor Gray
+                    Invoke-WebRequest -Uri "https://www.python.org/ftp/python/3.12.8/python-3.12.8-amd64.exe" -OutFile $pyPath -UseBasicParsing -TimeoutSec 180
                 }
 
-                # Metodo 3: Scoop
-                $final = & python --version 2>&1
-                if (-not ($final -match "^Python\s+\d")) {
-                    $scoop = Get-Command scoop -ErrorAction SilentlyContinue
-                    if ($scoop) {
-                        Write-Host "    Metodo 3: Scoop..." -ForegroundColor Gray
-                        & scoop install python 2>$null
+                if (Test-Path $pyPath) {
+                    # Abrir instalador com UI (usuario precisa completar)
+                    Write-Host "  [PYTHON] Abrindo instalador..." -ForegroundColor Gray
+                    Start-Process -FilePath $pyPath
+
+                    # Esperar o usuario instalar (timeout de 5 minutos)
+                    Write-Host "  [PYTHON] Aguardando instalacao (ate 5 minutos)..." -ForegroundColor Gray
+                    $timeout = 300
+                    $elapsed = 0
+                    while ($elapsed -lt $timeout) {
+                        Start-Sleep -Seconds 5
+                        $elapsed += 5
                         $env:Path = [Environment]::GetEnvironmentVariable("Path", "Machine") + ";" + [Environment]::GetEnvironmentVariable("Path", "User")
+                        $ver = & python --version 2>&1
+                        if ($ver -match "^Python\s+\d") {
+                            Write-Host "  [PYTHON] Python instalado: $ver" -ForegroundColor Green
+                            return
+                        }
+                        Write-Host "  [PYTHON] Aguardando... ($elapsed/$timeout s)" -ForegroundColor Gray
                     }
                 }
 
-                # Verificacao final
-                $final = & python --version 2>&1
-                if ($final -match "^Python\s+\d") {
-                    Write-Host "    Python OK: $final" -ForegroundColor Green
-                } else {
-                    Write-Host ""
-                    Write-Host "  [AVISO] Python NAO foi instalado." -ForegroundColor Yellow
-                    Write-Host "  Instale manualmente: https://www.python.org/downloads/" -ForegroundColor Yellow
-                    Write-Host "  IMPORTANTE: Marque 'Add Python to PATH' durante a instalacao!" -ForegroundColor Yellow
-                    Write-Host ""
-                }
+                # Se chegou aqui, falhou
+                Write-Host "  [PYTHON] Python NAO foi instalado." -ForegroundColor Red
+                Write-Host "  Instale manualmente: https://www.python.org/downloads/" -ForegroundColor Yellow
+                Write-Host "  IMPORTANTE: Marque 'Add Python to PATH'!" -ForegroundColor Yellow
             }
         },
         @{
@@ -568,37 +555,43 @@ function Run-InitialSetup {
         @{
             name = "PYTHON_DEPS"
             check = {
-                python -c "import openpyxl, docx, pptx, mcp, psutil, pdf2image, lxml" 2>$null
-                $LASTEXITCODE -eq 0
+                try {
+                    $ver = & python --version 2>&1
+                    if (-not ($ver -match "^Python\s+\d")) { return $false }
+                    python -c "import mcp" 2>$null
+                    $LASTEXITCODE -eq 0
+                } catch {
+                    return $false
+                }
             }
             install = {
-                Write-Host "  Instalando dependencias Python..." -ForegroundColor Gray
-                
-                # Verificar versao minima do Python (3.10+ para mcp)
-                $pyVersion = python -c "import sys; print(f'{sys.version_info.major}.{sys.version_info.minor}')" 2>$null
-                Write-Host "    Python version: $pyVersion" -ForegroundColor Gray
-                
-                # Atualizar pip
-                python -m pip install --upgrade pip 2>$null
-                
-                # Instalar pacotes essenciais
-                Write-Host "    Instalando mcp, openpyxl, python-docx, python-pptx..." -ForegroundColor Gray
-                $installOutput = python -m pip install openpyxl python-docx python-pptx mcp psutil pdf2image lxml 2>&1
-                $exitCode = $LASTEXITCODE
-                if ($exitCode -ne 0) {
-                    Write-Host "    [AVISO] Alguns pacotes podem ter falhado. Verificando..." -ForegroundColor Yellow
-                    # Verificar quais pacotes nao foram instalados
-                    python -c "import openpyxl; print('openpyxl OK')" 2>$null
-                    python -c "import docx; print('python-docx OK')" 2>$null
-                    python -c "import pptx; print('python-pptx OK')" 2>$null
-                    python -c "import mcp; print('mcp OK')" 2>$null
-                    python -c "import psutil; print('psutil OK')" 2>$null
-                    python -c "import pdf2image; print('pdf2image OK')" 2>$null
-                    python -c "import lxml; print('lxml OK')" 2>$null
+                # Verificar se Python funciona antes de tentar instalar
+                try {
+                    $ver = & python --version 2>&1
+                    if (-not ($ver -match "^Python\s+\d")) {
+                        Write-Host "  [PYTHON_DEPS] Python nao encontrado. Pulando dependencias." -ForegroundColor Yellow
+                        return
+                    }
+                } catch {
+                    Write-Host "  [PYTHON_DEPS] Python nao encontrado. Pulando dependencias." -ForegroundColor Yellow
+                    return
                 }
-                
-                # Pacotes opcionais (Windows-only)
-                python -m pip install pywin32 formulas msal 2>$null
+
+                Write-Host "  [PYTHON_DEPS] Instalando dependencias Python..." -ForegroundColor Cyan
+                python -m pip install --upgrade pip 2>&1 | ForEach-Object { Write-Host "    $_" -ForegroundColor Gray }
+                python -m pip install openpyxl python-docx python-pptx mcp psutil pdf2image lxml 2>&1 | ForEach-Object { Write-Host "    $_" -ForegroundColor Gray }
+
+                # Verificar
+                try {
+                    python -c "import mcp" 2>$null
+                    if ($LASTEXITCODE -eq 0) {
+                        Write-Host "  [PYTHON_DEPS] OK" -ForegroundColor Green
+                    } else {
+                        Write-Host "  [PYTHON_DEPS] Pacote 'mcp' nao instalado" -ForegroundColor Yellow
+                    }
+                } catch {
+                    Write-Host "  [PYTHON_DEPS] Erro ao verificar: $_" -ForegroundColor Yellow
+                }
             }
         }
     )
