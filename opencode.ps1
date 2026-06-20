@@ -342,21 +342,51 @@ function Run-InitialSetup {
             check = { $null -ne (Get-Command node -ErrorAction SilentlyContinue) }
             install = {
                 Write-Host "  Instalando Node.js (necessario para scripts de configuracao)..." -ForegroundColor Gray
-                # Prioridade: winget (mais confiavel) > Scoop > fallback manual
+                $nodeInstalled = $false
+                
+                # Metodo 1: winget (nativo do Windows 10/11)
                 $winget = Get-Command winget -ErrorAction SilentlyContinue
                 if ($winget) {
-                    Write-Host "    Usando winget (gerenciador nativo do Windows)..." -ForegroundColor Gray
+                    Write-Host "    Metodo 1: winget..." -ForegroundColor Gray
                     & winget install OpenJS.NodeJS --silent --accept-package-agreements 2>$null
-                } else {
+                    $nodeInstalled = $null -ne (Get-Command node -ErrorAction SilentlyContinue)
+                }
+                
+                # Metodo 2: Scoop
+                if (-not $nodeInstalled) {
                     $scoop = Get-Command scoop -ErrorAction SilentlyContinue
                     if ($scoop) {
-                        Write-Host "    Usando Scoop..." -ForegroundColor Gray
+                        Write-Host "    Metodo 2: Scoop..." -ForegroundColor Gray
                         & scoop install nodejs 2>$null
-                    } else {
-                        Write-Host "  [AVISO] Nao foi possivel instalar Node.js automaticamente." -ForegroundColor Yellow
-                        Write-Host "  Baixe manualmente em: https://nodejs.org" -ForegroundColor Yellow
-                        Write-Host "  Apos instalar, execute novamente." -ForegroundColor Yellow
+                        $nodeInstalled = $null -ne (Get-Command node -ErrorAction SilentlyContinue)
                     }
+                }
+                
+                # Metodo 3: Download direto do Node.js
+                if (-not $nodeInstalled) {
+                    Write-Host "    Metodo 3: Download direto do Node.js..." -ForegroundColor Gray
+                    try {
+                        $installerDir = Join-Path $OPENCODE_DATA "installers"
+                        if (-not (Test-Path $installerDir)) { New-Item -ItemType Directory -Path $installerDir -Force | Out-Null }
+                        $installerPath = Join-Path $installerDir "node-installer.msi"
+                        $nodeUrl = "https://nodejs.org/dist/latest/node-v22.x86.msi"
+                        Write-Host "    Baixando Node.js (via nodejs.org)..." -ForegroundColor Gray
+                        [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+                        Invoke-WebRequest -Uri $nodeUrl -OutFile $installerPath -UseBasicParsing -TimeoutSec 120
+                        if (Test-Path $installerPath) {
+                            Write-Host "    Instalando Node.js..." -ForegroundColor Gray
+                            Start-Process msiexec -ArgumentList "/i `"$installerPath`" /quiet /norestart" -Wait
+                            $nodeInstalled = $null -ne (Get-Command node -ErrorAction SilentlyContinue)
+                        }
+                    } catch {
+                        Write-Host "    [INFO] Download direto falhou: $($_.Exception.Message)" -ForegroundColor Gray
+                    }
+                }
+                
+                if (-not $nodeInstalled) {
+                    Write-Host "  [INFO] Node.js nao instalado automaticamente." -ForegroundColor Yellow
+                    Write-Host "  Baixe manualmente em: https://nodejs.org" -ForegroundColor Yellow
+                    Write-Host "  (Necessario para configuracao de caminhos MCP)" -ForegroundColor Yellow
                 }
             }
         },
