@@ -345,48 +345,64 @@ function Run-InitialSetup {
                 }
             }
             install = {
-                Write-Host "  [PYTHON] Instalando Python..." -ForegroundColor Cyan
-                Write-Host "  O instalador vai abrir. Marque 'Add Python to PATH' e clique 'Install Now'." -ForegroundColor Yellow
-                Write-Host ""
+                Write-Host "  [PYTHON] Instalando Python 3.12..." -ForegroundColor Cyan
 
-                # Download do instalador Python
-                $installerDir = Join-Path $OPENCODE_DATA "installers"
-                if (-not (Test-Path $installerDir)) { New-Item -ItemType Directory -Path $installerDir -Force | Out-Null }
-                $pyPath = Join-Path $installerDir "python-installer.exe"
-
-                # Verificar se ja existe um instalador baixado
-                if (-not (Test-Path $pyPath)) {
-                    [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
-                    Write-Host "  [PYTHON] Baixando Python 3.12.8..." -ForegroundColor Gray
-                    Invoke-WebRequest -Uri "https://www.python.org/ftp/python/3.12.8/python-3.12.8-amd64.exe" -OutFile $pyPath -UseBasicParsing -TimeoutSec 180
-                }
-
-                if (Test-Path $pyPath) {
-                    # Abrir instalador com UI (usuario precisa completar)
-                    Write-Host "  [PYTHON] Abrindo instalador..." -ForegroundColor Gray
-                    Start-Process -FilePath $pyPath
-
-                    # Esperar o usuario instalar (timeout de 5 minutos)
-                    Write-Host "  [PYTHON] Aguardando instalacao (ate 5 minutos)..." -ForegroundColor Gray
-                    $timeout = 300
-                    $elapsed = 0
-                    while ($elapsed -lt $timeout) {
-                        Start-Sleep -Seconds 5
-                        $elapsed += 5
-                        $env:Path = [Environment]::GetEnvironmentVariable("Path", "Machine") + ";" + [Environment]::GetEnvironmentVariable("Path", "User")
-                        $ver = & python --version 2>&1
-                        if ($ver -match "^Python\s+\d") {
-                            Write-Host "  [PYTHON] Python instalado: $ver" -ForegroundColor Green
-                            return
-                        }
-                        Write-Host "  [PYTHON] Aguardando... ($elapsed/$timeout s)" -ForegroundColor Gray
+                # Metodo 1: winget (silencioso com UAC)
+                $winget = Get-Command winget -ErrorAction SilentlyContinue
+                if ($winget) {
+                    Write-Host "  [PYTHON] Via winget (silencioso)..." -ForegroundColor Gray
+                    $pyJob = Start-Job -ScriptBlock { & winget install Python.Python.3.12 --silent --accept-package-agreements --accept-source-agreements 2>$null }
+                    $pyResult = Wait-Job -Job $pyJob -Timeout 300
+                    if (-not $pyResult) {
+                        Stop-Job -Job $pyJob
+                        Write-Host "  [PYTHON] winget excedeu o tempo." -ForegroundColor Yellow
+                    }
+                    Remove-Job -Job $pyJob -ErrorAction SilentlyContinue
+                    # Refresh PATH
+                    $env:Path = [Environment]::GetEnvironmentVariable("Path", "Machine") + ";" + [Environment]::GetEnvironmentVariable("Path", "User")
+                    $ver = & python --version 2>&1
+                    if ($ver -match "^Python\s+\d") {
+                        Write-Host "  [PYTHON] OK: $ver" -ForegroundColor Green
+                        return
                     }
                 }
 
-                # Se chegou aqui, falhou
-                Write-Host "  [PYTHON] Python NAO foi instalado." -ForegroundColor Red
-                Write-Host "  Instale manualmente: https://www.python.org/downloads/" -ForegroundColor Yellow
-                Write-Host "  IMPORTANTE: Marque 'Add Python to PATH'!" -ForegroundColor Yellow
+                # Metodo 2: Download direto (silencioso)
+                Write-Host "  [PYTHON] Via download direto..." -ForegroundColor Gray
+                try {
+                    $installerDir = Join-Path $OPENCODE_DATA "installers"
+                    if (-not (Test-Path $installerDir)) { New-Item -ItemType Directory -Path $installerDir -Force | Out-Null }
+                    $pyPath = Join-Path $installerDir "python-installer.exe"
+                    [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+                    Invoke-WebRequest -Uri "https://www.python.org/ftp/python/3.12.8/python-3.12.8-amd64.exe" -OutFile $pyPath -UseBasicParsing -TimeoutSec 180
+                    if (Test-Path $pyPath) {
+                        Write-Host "  [PYTHON] Instalando (silencioso)..." -ForegroundColor Gray
+                        $proc = Start-Process -FilePath $pyPath -ArgumentList "/quiet InstallAllUsers=0 PrependPath=1 Include_test=0" -Wait -PassThru -Verb RunAs
+                        $env:Path = [Environment]::GetEnvironmentVariable("Path", "Machine") + ";" + [Environment]::GetEnvironmentVariable("Path", "User")
+                        # Procurar python.exe
+                        $pyPaths = @(
+                            "$env:LOCALAPPDATA\Programs\Python\Python312\python.exe",
+                            "$env:LOCALAPPDATA\Programs\Python\Python311\python.exe",
+                            "$env:ProgramFiles\Python312\python.exe"
+                        )
+                        foreach ($p in $pyPaths) {
+                            if (Test-Path $p) {
+                                $env:Path = (Split-Path $p -Parent) + ";" + $env:Path
+                                break
+                            }
+                        }
+                    }
+                } catch {
+                    Write-Host "  [PYTHON] Download falhou: $($_.Exception.Message)" -ForegroundColor Yellow
+                }
+
+                # Verificacao final
+                $ver = & python --version 2>&1
+                if ($ver -match "^Python\s+\d") {
+                    Write-Host "  [PYTHON] OK: $ver" -ForegroundColor Green
+                } else {
+                    Write-Host "  [PYTHON] NAO instalado. Continuando..." -ForegroundColor Yellow
+                }
             }
         },
         @{
