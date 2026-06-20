@@ -376,11 +376,17 @@ function Run-InitialSetup {
                 Write-Host "  Instalando Node.js (necessario para scripts de configuracao)..." -ForegroundColor Gray
                 $nodeInstalled = $false
                 
-                # Metodo 1: winget (nativo do Windows 10/11)
+                # Metodo 1: winget (com timeout de 120s)
                 $winget = Get-Command winget -ErrorAction SilentlyContinue
                 if ($winget) {
-                    Write-Host "    Metodo 1: winget..." -ForegroundColor Gray
-                    & winget install OpenJS.NodeJS --silent --accept-package-agreements 2>$null
+                    Write-Host "    Metodo 1: winget (timeout 120s)..." -ForegroundColor Gray
+                    $wingetJob = Start-Job -ScriptBlock { param($a) & winget install OpenJS.NodeJS --silent --accept-package-agreements 2>$null } -ArgumentList $null
+                    $wingetResult = Wait-Job -Job $wingetJob -Timeout 120
+                    if (-not $wingetResult) {
+                        Stop-Job -Job $wingetJob
+                        Write-Host "    [INFO] winget excedeu o tempo limite. Continuando..." -ForegroundColor Gray
+                    }
+                    Remove-Job -Job $wingetJob -ErrorAction SilentlyContinue
                     $nodeInstalled = $null -ne (Get-Command node -ErrorAction SilentlyContinue)
                 }
                 
