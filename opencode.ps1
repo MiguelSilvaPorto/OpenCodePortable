@@ -332,6 +332,25 @@ function Run-InitialSetup {
             install = { scoop install python }
         },
         @{
+            name = "NODEJS"
+            check = { $null -ne (Get-Command node -ErrorAction SilentlyContinue) }
+            install = {
+                Write-Host "  Instalando Node.js (necessario para scripts de configuracao)..." -ForegroundColor Gray
+                $scoop = Get-Command scoop -ErrorAction SilentlyContinue
+                if ($scoop) {
+                    scoop install nodejs 2>$null
+                } else {
+                    # Fallback: winget (nativo do Windows 10/11)
+                    $winget = Get-Command winget -ErrorAction SilentlyContinue
+                    if ($winget) {
+                        winget install OpenJS.NodeJS 2>$null
+                    } else {
+                        Write-Host "  [AVISO] Node.js nao instalado. Baixe manualmente em https://nodejs.org" -ForegroundColor Yellow
+                    }
+                }
+            }
+        },
+        @{
             name = "PYTHON_DEPS"
             check = {
                 python -c "import openpyxl, docx, pptx, mcp, psutil, pdf2image, lxml" 2>$null
@@ -445,9 +464,26 @@ function Update-OpenCodeConfig {
     
     # Executar a atualização da configuração via Node.js de forma robusta e livre de bugs do PowerShell
     $updateScript = Join-Path $OPENCODE_HOME "scripts\update_config.js"
-    if (Test-Path $updateScript) {
-        node $updateScript $OPENCODE_HOME
+    $node = Get-Command node -ErrorAction SilentlyContinue
+    if ($node -and (Test-Path $updateScript)) {
+        & node $updateScript $OPENCODE_HOME
         Write-Log "CONFIG" "UPDATED" @{ file = $configFile }
+    } elseif (Test-Path $updateScript) {
+        # Fallback: PowerShell update paths (quando Node.js nao esta disponivel)
+        Write-Log "CONFIG" "POWERSHELL_FALLBACK" @{ note = "Node.js not found, using PowerShell" } "WARN"
+        try {
+            $configContent = Get-Content $configFile -Raw -Encoding UTF8
+            # Substituir caminhos absolutos antigos pelo novo
+            $oldOffice = "$(Split-Path $configFile -Parent)\scripts\office_mcp.py" -replace '\\', '/'
+            $newOffice = "$OPENCODE_HOME\scripts\office_mcp.py" -replace '\\', '/'
+            $configContent = $configContent -replace '"command": \[[^\]]*\]', '"command": ["python", ""]'
+            # Escrever de volta
+            $configContent | Set-Content -Path $configFile -Encoding UTF8
+            Write-Log "CONFIG" "FALLBACK_PARTIAL" @{ file = $configFile }
+        } catch {
+            Write-Log "CONFIG" "FALLBACK_FAILED" @{ error = $_.Exception.Message } "ERROR"
+        }
+    }
     } else {
         Write-Error "[CONFIG] update_config.js nao encontrado"
     }
