@@ -131,9 +131,9 @@ try {
                                 $event = $logEntry.event
                                 $context = $logEntry.context
                                 
-                                # Filtrar caminhos contendo Projects/ ou multitask-worktrees para evitar falsos positivos
+                                # Filtrar caminhos contendo Projects/ ou worktrees para evitar falsos positivos
                                 $pathString = $context | ConvertTo-Json -Compress
-                                if ($pathString -match "Projects" -or $pathString -match "worktrees" -or $pathString -match "multitask-worktrees") {
+                                if ($pathString -match "Projects" -or $pathString -match "worktrees") {
                                     continue
                                 }
                                 
