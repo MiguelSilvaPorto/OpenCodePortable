@@ -336,8 +336,46 @@ function Run-InitialSetup {
         },
         @{
             name = "PYTHON"
-            check = { $null -ne (Get-Command python -ErrorAction SilentlyContinue) }
-            install = { scoop install python }
+            check = {
+                $py = Get-Command python -ErrorAction SilentlyContinue
+                if (-not $py) { return $false }
+                # Verificar se e o Python real (nao o launcher ou stub do Store)
+                $ver = & python --version 2>&1
+                $ver -match "^Python\s+\d"
+            }
+            install = {
+                Write-Host "  Instalando Python..." -ForegroundColor Gray
+                $winget = Get-Command winget -ErrorAction SilentlyContinue
+                if ($winget) {
+                    Write-Host "    Via winget..." -ForegroundColor Gray
+                    & winget install Python.Python.3.12 --silent --accept-package-agreements 2>$null
+                    $env:Path = [Environment]::GetEnvironmentVariable("Path", "Machine") + ";" + [Environment]::GetEnvironmentVariable("Path", "User")
+                } else {
+                    $scoop = Get-Command scoop -ErrorAction SilentlyContinue
+                    if ($scoop) {
+                        & scoop install python 2>$null
+                        $env:Path = [Environment]::GetEnvironmentVariable("Path", "Machine") + ";" + [Environment]::GetEnvironmentVariable("Path", "User")
+                    } else {
+                        # Download direto
+                        Write-Host "    Baixando Python (via python.org)..." -ForegroundColor Gray
+                        try {
+                            $installerDir = Join-Path $OPENCODE_DATA "installers"
+                            if (-not (Test-Path $installerDir)) { New-Item -ItemType Directory -Path $installerDir -Force | Out-Null }
+                            $pyUrl = "https://www.python.org/ftp/python/3.12.10/python-3.12.10-amd64.exe"
+                            $pyPath = Join-Path $installerDir "python-installer.exe"
+                            [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+                            Invoke-WebRequest -Uri $pyUrl -OutFile $pyPath -UseBasicParsing -TimeoutSec 180
+                            if (Test-Path $pyPath) {
+                                & $pyPath /quiet InstallAllUsers=1 PrependPath=1 2>$null
+                                $env:Path = [Environment]::GetEnvironmentVariable("Path", "Machine") + ";" + [Environment]::GetEnvironmentVariable("Path", "User")
+                            }
+                        } catch {
+                            Write-Host "  [INFO] Falha ao instalar Python automaticamente." -ForegroundColor Yellow
+                            Write-Host "  Baixe de: https://www.python.org/downloads/" -ForegroundColor Yellow
+                        }
+                    }
+                }
+            }
         },
         @{
             name = "WINGET"
