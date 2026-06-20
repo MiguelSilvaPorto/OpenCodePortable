@@ -266,8 +266,10 @@ function Download-OpenCodeExe {
 
 function Run-InitialSetup {
     $configFile = Join-Path $OPENCODE_CONFIG "opencode.jsonc"
-    if ((Test-Path $FIRST_RUN_MARKER) -and (Test-Path $configFile)) {
-        Write-Log "SETUP" "SKIPPED" @{ reason = "MARKER_AND_CONFIG_EXIST"; marker = $FIRST_RUN_MARKER }
+    $nodeInstalled = $null -ne (Get-Command node -ErrorAction SilentlyContinue)
+    $pythonInstalled = $null -ne (Get-Command python -ErrorAction SilentlyContinue)
+    if ((Test-Path $FIRST_RUN_MARKER) -and (Test-Path $configFile) -and $nodeInstalled) {
+        Write-Log "SETUP" "SKIPPED" @{ reason = "Todos os componentes ja instalados"; marker = $FIRST_RUN_MARKER }
         return $true
     }
 
@@ -509,9 +511,10 @@ function Run-InitialSetup {
         Write-Error "[CONFIG] update_config.js nao encontrado"
     }
 
-    # Criar marker apenas se Python esta instalado (dependencia critica)
+    # Criar marker apenas se Python e Node.js estao instalados
     $pythonCheck = Get-Command python -ErrorAction SilentlyContinue
-    if ($pythonCheck) {
+    $nodeCheck = Get-Command node -ErrorAction SilentlyContinue
+    if ($pythonCheck -and $nodeCheck) {
         New-Item -ItemType File -Path $FIRST_RUN_MARKER -Force | Out-Null
         Write-Log "SETUP" "COMPLETED" @{ marker = $FIRST_RUN_MARKER }
 
@@ -522,12 +525,15 @@ function Run-InitialSetup {
         Write-Host "  Brain Memory: busca vetorial com nomic-embed-text" -ForegroundColor Gray
         Write-Host ""
     } else {
-        Write-Log "SETUP" "INCOMPLETE" @{ reason = "Python not installed" } "WARN"
+        $missing = @()
+        if (-not $pythonCheck) { $missing += "Python" }
+        if (-not $nodeCheck) { $missing += "Node.js" }
+        Write-Log "SETUP" "INCOMPLETE" @{ reason = "Faltando: $($missing -join ', ')" } "WARN"
         Write-Host ""
         Write-Host "============================================" -ForegroundColor Yellow
         Write-Host "  Configuracao Inicial INCOMPLETA!" -ForegroundColor Yellow
         Write-Host "============================================" -ForegroundColor Yellow
-        Write-Host "  Python nao foi instalado. O setup rodara novamente na proxima execucao." -ForegroundColor Gray
+        Write-Host "  $($missing -join ' e ') nao foram instalados. O setup rodara novamente." -ForegroundColor Gray
         Write-Host ""
     }
     return $true
