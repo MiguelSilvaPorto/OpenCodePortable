@@ -341,7 +341,12 @@ function Download-OpenCodeExe {
 function Run-InitialSetup {
     $configFile = Join-Path $OPENCODE_CONFIG "opencode.jsonc"
     $nodeInstalled = $null -ne (Get-Command node -ErrorAction SilentlyContinue)
-    if ((Test-Path $FIRST_RUN_MARKER) -and (Test-Path $configFile) -and $nodeInstalled) {
+    $mcpInstalled = $false
+    try {
+        python -c "import mcp" 2>$null
+        $mcpInstalled = $LASTEXITCODE -eq 0
+    } catch {}
+    if ((Test-Path $FIRST_RUN_MARKER) -and (Test-Path $configFile) -and $nodeInstalled -and $mcpInstalled) {
         Write-Log "SETUP" "SKIPPED" @{ reason = "Todos os componentes ja instalados"; marker = $FIRST_RUN_MARKER }
         return $true
     }
@@ -583,33 +588,41 @@ function Run-InitialSetup {
                 }
             }
             install = {
-                # Verificar se Python funciona antes de tentar instalar
+                Write-Host "  [DEPS] Instalando dependencias Python..." -ForegroundColor Cyan
+
+                # Verificar Python
                 try {
                     $ver = & python --version 2>&1
                     if (-not ($ver -match "^Python\s+\d")) {
-                        Write-Host "  [PYTHON_DEPS] Python nao encontrado. Pulando dependencias." -ForegroundColor Yellow
+                        Write-Host "  [DEPS] Python nao encontrado." -ForegroundColor Yellow
                         return
                     }
+                    Write-Host "  [DEPS] Python: $ver" -ForegroundColor Gray
                 } catch {
-                    Write-Host "  [PYTHON_DEPS] Python nao encontrado. Pulando dependencias." -ForegroundColor Yellow
+                    Write-Host "  [DEPS] Python nao encontrado." -ForegroundColor Yellow
                     return
                 }
 
-                Write-Host "  [PYTHON_DEPS] Instalando dependencias Python..." -ForegroundColor Cyan
-                python -m pip install --upgrade pip 2>&1 | ForEach-Object { Write-Host "    $_" -ForegroundColor Gray }
-                python -m pip install openpyxl python-docx python-pptx mcp psutil pdf2image lxml 2>&1 | ForEach-Object { Write-Host "    $_" -ForegroundColor Gray }
+                # Atualizar pip
+                Write-Host "  [DEPS] Atualizando pip..." -ForegroundColor Gray
+                python -m pip install --upgrade pip 2>&1 | Out-Null
 
-                # Verificar
-                try {
-                    python -c "import mcp" 2>$null
-                    if ($LASTEXITCODE -eq 0) {
-                        Write-Host "  [PYTHON_DEPS] OK" -ForegroundColor Green
+                # Instalar cada pacote individualmente para debug
+                $packages = @("mcp", "openpyxl", "python-docx", "python-pptx", "psutil", "lxml")
+                $ok = 0
+                $fail = 0
+                foreach ($pkg in $packages) {
+                    Write-Host "  [DEPS] Instalando $pkg..." -ForegroundColor Gray
+                    $output = python -m pip install $pkg 2>&1 | Out-String
+                    if ($output -match "Successfully installed|already satisfied") {
+                        Write-Host "  [DEPS]   $pkg OK" -ForegroundColor Green
+                        $ok++
                     } else {
-                        Write-Host "  [PYTHON_DEPS] Pacote 'mcp' nao instalado" -ForegroundColor Yellow
+                        Write-Host "  [DEPS]   $pkg FALHA: $($output.Split("`n")[-1])" -ForegroundColor Red
+                        $fail++
                     }
-                } catch {
-                    Write-Host "  [PYTHON_DEPS] Erro ao verificar: $_" -ForegroundColor Yellow
                 }
+                Write-Host "  [DEPS] Resultado: $ok OK, $fail FALHA" -ForegroundColor Cyan
             }
         }
     )
@@ -674,10 +687,15 @@ function Run-InitialSetup {
         Write-Error "[CONFIG] update_config.js nao encontrado"
     }
 
-    # Criar marker apenas se Python e Node.js estao instalados
+    # Criar marker apenas se Python, Node.js E dependencias estao OK
     $pythonCheck = Get-Command python -ErrorAction SilentlyContinue
     $nodeCheck = Get-Command node -ErrorAction SilentlyContinue
-    if ($pythonCheck -and $nodeCheck) {
+    $depsCheck = $false
+    try {
+        python -c "import mcp" 2>$null
+        $depsCheck = $LASTEXITCODE -eq 0
+    } catch {}
+    if ($pythonCheck -and $nodeCheck -and $depsCheck) {
         New-Item -ItemType File -Path $FIRST_RUN_MARKER -Force | Out-Null
         Write-Log "SETUP" "COMPLETED" @{ marker = $FIRST_RUN_MARKER }
 
@@ -691,6 +709,7 @@ function Run-InitialSetup {
         $missing = @()
         if (-not $pythonCheck) { $missing += "Python" }
         if (-not $nodeCheck) { $missing += "Node.js" }
+        if (-not $depsCheck) { $missing += "dependencias MCP" }
         Write-Log "SETUP" "INCOMPLETE" @{ reason = "Faltando: $($missing -join ', ')" } "WARN"
         Write-Host ""
         Write-Host "============================================" -ForegroundColor Yellow
