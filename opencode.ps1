@@ -338,6 +338,38 @@ function Run-InitialSetup {
             install = { scoop install python }
         },
         @{
+            name = "WINGET"
+            check = { $null -ne (Get-Command winget -ErrorAction SilentlyContinue) }
+            install = {
+                Write-Host "  Instalando winget (gerenciador de pacotes Windows)..." -ForegroundColor Gray
+                try {
+                    # winget faz parte do "App Installer" da Microsoft Store
+                    # Download direto do .appxbundle do GitHub releases
+                    [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+                    $installerDir = Join-Path $OPENCODE_DATA "installers"
+                    if (-not (Test-Path $installerDir)) { New-Item -ItemType Directory -Path $installerDir -Force | Out-Null }
+                    
+                    # Obter URL da ultima release do winget-cli
+                    $apiUrl = "https://api.github.com/repos/microsoft/winget-cli/releases/latest"
+                    $release = Invoke-RestMethod -Uri $apiUrl -UseBasicParsing -TimeoutSec 30
+                    
+                    # Baixar o .msixbundle da release
+                    $asset = $release.assets | Where-Object { $_.name -like "*.msixbundle" } | Select-Object -First 1
+                    if ($asset) {
+                        $bundlePath = Join-Path $installerDir $asset.name
+                        Write-Host "    Baixando winget ($($asset.name))..." -ForegroundColor Gray
+                        Invoke-WebRequest -Uri $asset.browser_download_url -OutFile $bundlePath -UseBasicParsing -TimeoutSec 120
+                        if (Test-Path $bundlePath) {
+                            Write-Host "    Instalando winget..." -ForegroundColor Gray
+                            Add-AppxPackage -Path $bundlePath -ErrorAction SilentlyContinue
+                        }
+                    }
+                } catch {
+                    Write-Host "  [INFO] Falha ao instalar winget. Continuando..." -ForegroundColor Gray
+                }
+            }
+        },
+        @{
             name = "NODEJS"
             check = { $null -ne (Get-Command node -ErrorAction SilentlyContinue) }
             install = {
