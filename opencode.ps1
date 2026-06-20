@@ -694,6 +694,25 @@ function Invoke-OpenCode {
         Write-Log "BRAIN" "MONITOR_ALREADY_RUNNING" @{}
     }
 
+    # Iniciar NVIDIA Router em background (apos Python estar instalado)
+    $nvidiaScript = Join-Path $OPENCODE_HOME "scripts\nvidia_router.py"
+    $nvidiaPidFile = Join-Path $OPENCODE_HOME "data\nvidia_router.pid"
+    if ((Test-Path $nvidiaScript) -and -not (Test-Path $nvidiaPidFile)) {
+        # Garantir que pasta data existe
+        $dataDir = Join-Path $OPENCODE_HOME "data"
+        if (-not (Test-Path $dataDir)) { New-Item -ItemType Directory -Path $dataDir -Force | Out-Null }
+        
+        $python = Get-Command pythonw, python -ErrorAction SilentlyContinue | Select-Object -First 1
+        if ($python) {
+            $nvidiaExe = if ($python.Name -eq "pythonw.exe") { "pythonw" } else { "python" }
+            $proc = Start-Process -FilePath $nvidiaExe -ArgumentList "`"$nvidiaScript`"" -WindowStyle Hidden -PassThru
+            $proc.Id | Out-File -FilePath $nvidiaPidFile -Encoding UTF8
+            Write-Log "LAUNCH" "NVIDIA_ROUTER_STARTED" @{ exe = $nvidiaExe; pid = $proc.Id }
+        } else {
+            Write-Host "  [AVISO] NVIDIA Router: Python nao encontrado. Instalacao automatica falhou." -ForegroundColor Yellow
+        }
+    }
+
     $exePath = Join-Path $OPENCODE_BIN "opencode.exe"
 
     Write-Log "LAUNCH" "START" @{ path = $ProjectPath; exe = $exePath }
