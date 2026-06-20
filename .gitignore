@@ -32,10 +32,6 @@ bin/opencode.exe
 .cache/
 .config/
 
-# Multitask worktrees
-multitask-worktrees/
-Projects/*/multitask-worktrees/
-
 # Project local workspace settings
 .opencode/workspace.json
 

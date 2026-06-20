@@ -23,8 +23,6 @@ config/opencode.jsonc
 | Plugin | Tipo | Descricao |
 |--------|------|-----------|
 | `@renjfk/opencode-voice` | Externo | Reconhecimento de voz via Ollama/Groq |
-| `multitask` | Interno | Agent para tarefas em background |
-| `multitask-tui.tsx` | Interno | Interface TUI do multitask |
 | `workspace-tui.tsx` | Interno | Interface TUI de workspaces |
 | `auto-switch-mode.ts` | Interno | Troca automatica de modo |
 

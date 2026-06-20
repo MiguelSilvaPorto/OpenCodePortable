@@ -56,8 +56,7 @@ A cada execucao, verifica e instala automaticamente dependencias faltantes:
 6. Health check de dependencias
 7. Se marker nao existe: setup inicial completo
 8. Corrigir caminhos MCP
-9. Criar juncao multitask-worktrees
-10. Iniciar opencode.exe
+9. Iniciar opencode.exe
 ```
 
 ## Erros Comuns
