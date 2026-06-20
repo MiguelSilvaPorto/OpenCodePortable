@@ -278,32 +278,52 @@ function Run-InitialSetup {
             name = "SCOOP"
             check = { $null -ne (Get-Command scoop -ErrorAction SilentlyContinue) }
             install = {
-                Set-ExecutionPolicy RemoteSigned -Scope CurrentUser -Force
-                [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
-                Invoke-RestMethod -Uri https://get.scoop.sh | Invoke-Expression
+                Write-Host "  Instalando Scoop (gerenciador de pacotes)..." -ForegroundColor Gray
+                try {
+                    Set-ExecutionPolicy RemoteSigned -Scope CurrentUser -Force 2>$null
+                    [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+                    powershell -NoProfile -ExecutionPolicy Bypass -Command "Invoke-RestMethod -Uri https://get.scoop.sh | Invoke-Expression" 2>$null
+                } catch {
+                    Write-Host "  [AVISO] Falha ao instalar Scoop: $($_.Exception.Message)" -ForegroundColor Yellow
+                    Write-Host "  Dependencias de voz (whisper, sox) nao serao instaladas." -ForegroundColor Yellow
+                }
             }
         },
         @{
             name = "EXTRAS_BUCKET"
-            check = { scoop bucket list 2>$null | Select-String -Pattern "extras" }
-            install = { scoop bucket add extras }
+            check = { $null -ne (Get-Command scoop -ErrorAction SilentlyContinue) -and (scoop bucket list 2>$null | Select-String -Pattern "extras") }
+            install = { scoop bucket add extras 2>$null }
         },
         @{
             name = "WHISPER_CPP"
             check = { $null -ne (Get-Command whisper-cli -ErrorAction SilentlyContinue) }
-            install = { scoop install whisper-cpp }
+            install = { scoop install whisper-cpp 2>$null }
         },
         @{
             name = "SOX"
             check = { $null -ne (Get-Command sox -ErrorAction SilentlyContinue) }
-            install = { scoop install sox }
+            install = { scoop install sox 2>$null }
         },
         @{
             name = "WHISPER_MODEL"
             check = { Test-Path (Join-Path $MODELS_DIR "ggml-base.bin") }
             install = {
                 if (-not (Test-Path $MODELS_DIR)) { New-Item -ItemType Directory -Path $MODELS_DIR -Force | Out-Null }
-                curl -L -o (Join-Path $MODELS_DIR "ggml-base.bin") "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-base.bin"
+                Write-Host "  Baixando modelo Whisper (148MB)..." -ForegroundColor Gray
+                # Usar Invoke-WebRequest ao inves de curl -L (nao funciona no PowerShell 5.1)
+                try {
+                    $url = "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-base.bin"
+                    $output = Join-Path $MODELS_DIR "ggml-base.bin"
+                    Invoke-WebRequest -Uri $url -OutFile $output -UseBasicParsing -TimeoutSec 300
+                } catch {
+                    # Fallback para curl.exe se disponivel
+                    $curl = Get-Command curl.exe -ErrorAction SilentlyContinue
+                    if ($curl) {
+                        & $curl.exe -L -o $output $url 2>$null
+                    } else {
+                        Write-Host "  [AVISO] Falha ao baixar modelo Whisper" -ForegroundColor Yellow
+                    }
+                }
             }
         },
         @{
@@ -314,12 +334,20 @@ function Run-InitialSetup {
         @{
             name = "PYTHON_DEPS"
             check = {
-                python -c "import openpyxl, docx, pptx, mcp, win32com.client, psutil, formulas, msal, pdf2image, lxml" 2>$null
+                python -c "import openpyxl, docx, pptx, mcp, psutil, pdf2image, lxml" 2>$null
                 $LASTEXITCODE -eq 0
             }
             install = {
+                Write-Host "  Instalando dependencias Python..." -ForegroundColor Gray
                 python -m pip install --upgrade pip 2>$null
-                python -m pip install openpyxl python-docx python-pptx pywin32 mcp psutil formulas msal pdf2image lxml 2>$null
+                # Instalar em lotes para evitar falha total
+                python -m pip install openpyxl python-docx python-pptx mcp psutil pdf2image lxml 2>$null
+                # pywin32 e formulas sao opcionais (Windows-only)
+                try {
+                    python -m pip install pywin32 formulas msal 2>$null
+                } catch {
+                    Write-Host "  [INFO] Dependencias opcionais nao instaladas (pywin32, formulas, msal)" -ForegroundColor Gray
+                }
             }
         }
     )
@@ -384,16 +412,27 @@ function Run-InitialSetup {
         Write-Error "[CONFIG] update_config.js nao encontrado"
     }
 
-    # Criar marker
-    New-Item -ItemType File -Path $FIRST_RUN_MARKER -Force | Out-Null
-    Write-Log "SETUP" "COMPLETED" @{ marker = $FIRST_RUN_MARKER }
+    # Criar marker apenas se Python esta instalado (dependencia critica)
+    $pythonCheck = Get-Command python -ErrorAction SilentlyContinue
+    if ($pythonCheck) {
+        New-Item -ItemType File -Path $FIRST_RUN_MARKER -Force | Out-Null
+        Write-Log "SETUP" "COMPLETED" @{ marker = $FIRST_RUN_MARKER }
 
-    Write-Host ""
-    Write-Host "============================================" -ForegroundColor Green
-    Write-Host "  Configuracao Inicial Concluida!" -ForegroundColor Green
-    Write-Host "============================================" -ForegroundColor Green
-    Write-Host "  Brain Memory: busca vetorial com nomic-embed-text" -ForegroundColor Gray
-    Write-Host ""
+        Write-Host ""
+        Write-Host "============================================" -ForegroundColor Green
+        Write-Host "  Configuracao Inicial Concluida!" -ForegroundColor Green
+        Write-Host "============================================" -ForegroundColor Green
+        Write-Host "  Brain Memory: busca vetorial com nomic-embed-text" -ForegroundColor Gray
+        Write-Host ""
+    } else {
+        Write-Log "SETUP" "INCOMPLETE" @{ reason = "Python not installed" } "WARN"
+        Write-Host ""
+        Write-Host "============================================" -ForegroundColor Yellow
+        Write-Host "  Configuracao Inicial INCOMPLETA!" -ForegroundColor Yellow
+        Write-Host "============================================" -ForegroundColor Yellow
+        Write-Host "  Python nao foi instalado. O setup rodara novamente na proxima execucao." -ForegroundColor Gray
+        Write-Host ""
+    }
     return $true
 }
 
@@ -758,7 +797,7 @@ if (Test-Path $monitorScript) {
 
 Write-Log "SYSTEM" "START" @{
     ps_version = $PSVersionTable.PSVersion.ToString()
-    os = if ($IsWindows) { "Windows" } elseif ($IsLinux) { "Linux" } else { "macOS" }
+    os = if ($PSVersionTable.PSEdition -eq "Desktop") { "Windows" } elseif ($IsWindows) { "Windows" } elseif ($IsLinux) { "Linux" } else { $PSVersionTable.Platform }
     pid = $PID
     args = if ($Arguments) { $Arguments -join " " } else { "" }
 }
