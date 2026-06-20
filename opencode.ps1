@@ -468,21 +468,8 @@ function Update-OpenCodeConfig {
     if ($node -and (Test-Path $updateScript)) {
         & node $updateScript $OPENCODE_HOME
         Write-Log "CONFIG" "UPDATED" @{ file = $configFile }
-    } elseif (Test-Path $updateScript) {
-        # Fallback: PowerShell update paths (quando Node.js nao esta disponivel)
-        Write-Log "CONFIG" "POWERSHELL_FALLBACK" @{ note = "Node.js not found, using PowerShell" } "WARN"
-        try {
-            $configContent = Get-Content $configFile -Raw -Encoding UTF8
-            # Substituir caminhos absolutos antigos pelo novo
-            $oldOffice = "$(Split-Path $configFile -Parent)\scripts\office_mcp.py" -replace '\\', '/'
-            $newOffice = "$OPENCODE_HOME\scripts\office_mcp.py" -replace '\\', '/'
-            $configContent = $configContent -replace '"command": \[[^\]]*\]', '"command": ["python", ""]'
-            # Escrever de volta
-            $configContent | Set-Content -Path $configFile -Encoding UTF8
-            Write-Log "CONFIG" "FALLBACK_PARTIAL" @{ file = $configFile }
-        } catch {
-            Write-Log "CONFIG" "FALLBACK_FAILED" @{ error = $_.Exception.Message } "ERROR"
-        }
+    } elseif (-not $node) {
+        Write-Log "CONFIG" "NODE_MISSING" @{ hint = "Node.js sera instalado na proxima execucao do setup" } "WARN"
     }
     } else {
         Write-Error "[CONFIG] update_config.js nao encontrado"
