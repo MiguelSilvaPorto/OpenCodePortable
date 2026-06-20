@@ -44,6 +44,80 @@ $TIMEOUT_DOWNLOAD  = 120
 $TIMEOUT_API       = 15
 
 # ============================================================================
+# GARANTIR PYTHON ANTES DE TUDO (dependencia critica)
+# ============================================================================
+
+function Ensure-Python {
+    # Verificar se Python real ja existe
+    try {
+        $ver = & python --version 2>&1
+        if ($ver -match "^Python\s+\d") {
+            $exe = & python -c "import sys; print(sys.executable)" 2>&1
+            if ($exe -and -not ($exe -match "WindowsApps") -and (Test-Path $exe)) {
+                return $true
+            }
+        }
+    } catch {}
+
+    Write-Host "  [PYTHON] Instalando Python 3.12..." -ForegroundColor Cyan
+
+    # Download do instalador
+    $installerDir = Join-Path $OPENCODE_DATA "installers"
+    if (-not (Test-Path $installerDir)) { New-Item -ItemType Directory -Path $installerDir -Force | Out-Null }
+    $pyPath = Join-Path $installerDir "python-installer.exe"
+
+    if (-not (Test-Path $pyPath)) {
+        [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+        Write-Host "  [PYTHON] Baixando Python 3.12.8..." -ForegroundColor Gray
+        try {
+            Invoke-WebRequest -Uri "https://www.python.org/ftp/python/3.12.8/python-3.12.8-amd64.exe" -OutFile $pyPath -UseBasicParsing -TimeoutSec 180
+        } catch {
+            Write-Host "  [PYTHON] Falha no download: $($_.Exception.Message)" -ForegroundColor Yellow
+            return $false
+        }
+    }
+
+    if (Test-Path $pyPath) {
+        Write-Host "  [PYTHON] Instalando com privilegios admin..." -ForegroundColor Gray
+        try {
+            Start-Process -FilePath "powershell.exe" -ArgumentList "-NoProfile -ExecutionPolicy Bypass -Command `"& '$pyPath' /quiet InstallAllUsers=0 PrependPath=1 Include_test=0`"" -Verb RunAs -Wait
+        } catch {
+            Write-Host "  [PYTHON] Instalacao cancelada ou falhou." -ForegroundColor Yellow
+            return $false
+        }
+        # Refresh PATH
+        $env:Path = [Environment]::GetEnvironmentVariable("Path", "Machine") + ";" + [Environment]::GetEnvironmentVariable("Path", "User")
+        # Procurar python.exe em locais comuns
+        $pyPaths = @(
+            "$env:LOCALAPPDATA\Programs\Python\Python312\python.exe",
+            "$env:LOCALAPPDATA\Programs\Python\Python311\python.exe",
+            "$env:ProgramFiles\Python312\python.exe"
+        )
+        foreach ($p in $pyPaths) {
+            if (Test-Path $p) {
+                $env:Path = (Split-Path $p -Parent) + ";" + $env:Path
+                break
+            }
+        }
+    }
+
+    # Verificacao final
+    try {
+        $ver = & python --version 2>&1
+        if ($ver -match "^Python\s+\d") {
+            Write-Host "  [PYTHON] OK: $ver" -ForegroundColor Green
+            return $true
+        }
+    } catch {}
+
+    Write-Host "  [PYTHON] NAO instalado." -ForegroundColor Yellow
+    return $false
+}
+
+# Executar imediatamente
+Ensure-Python | Out-Null
+
+# ============================================================================
 # SISTEMA DE LOGS JSONL (AI-Readable)
 # ============================================================================
 
@@ -331,61 +405,6 @@ function Run-InitialSetup {
                     } else {
                         Write-Host "  [AVISO] Falha ao baixar modelo Whisper" -ForegroundColor Yellow
                     }
-                }
-            }
-        },
-        @{
-            name = "PYTHON"
-            check = {
-                try {
-                    $ver = & python --version 2>&1
-                    if (-not ($ver -match "^Python\s+\d")) { return $false }
-                    $exe = & python -c "import sys; print(sys.executable)" 2>&1
-                    if ($exe -match "WindowsApps") { return $false }
-                    return (Test-Path $exe)
-                } catch {
-                    return $false
-                }
-            }
-            install = {
-                Write-Host "  [PYTHON] Instalando Python 3.12..." -ForegroundColor Cyan
-
-                # Metodo 1: Download direto (silencioso com admin)
-                try {
-                    $installerDir = Join-Path $OPENCODE_DATA "installers"
-                    if (-not (Test-Path $installerDir)) { New-Item -ItemType Directory -Path $installerDir -Force | Out-Null }
-                    $pyPath = Join-Path $installerDir "python-installer.exe"
-                    if (-not (Test-Path $pyPath)) {
-                        [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
-                        Write-Host "  [PYTHON] Baixando Python 3.12.8..." -ForegroundColor Gray
-                        Invoke-WebRequest -Uri "https://www.python.org/ftp/python/3.12.8/python-3.12.8-amd64.exe" -OutFile $pyPath -UseBasicParsing -TimeoutSec 180
-                    }
-                    if (Test-Path $pyPath) {
-                        Write-Host "  [PYTHON] Instalando com privilegios admin..." -ForegroundColor Gray
-                        Start-Process -FilePath "powershell.exe" -ArgumentList "-NoProfile -ExecutionPolicy Bypass -Command `"& '$pyPath' /quiet InstallAllUsers=0 PrependPath=1 Include_test=0`"" -Verb RunAs -Wait
-                        $env:Path = [Environment]::GetEnvironmentVariable("Path", "Machine") + ";" + [Environment]::GetEnvironmentVariable("Path", "User")
-                        $pyPaths = @(
-                            "$env:LOCALAPPDATA\Programs\Python\Python312\python.exe",
-                            "$env:LOCALAPPDATA\Programs\Python\Python311\python.exe",
-                            "$env:ProgramFiles\Python312\python.exe"
-                        )
-                        foreach ($p in $pyPaths) {
-                            if (Test-Path $p) {
-                                $env:Path = (Split-Path $p -Parent) + ";" + $env:Path
-                                break
-                            }
-                        }
-                    }
-                } catch {
-                    Write-Host "  [PYTHON] Falha: $($_.Exception.Message)" -ForegroundColor Yellow
-                }
-
-                # Verificacao final
-                $ver = & python --version 2>&1
-                if ($ver -match "^Python\s+\d") {
-                    Write-Host "  [PYTHON] OK: $ver" -ForegroundColor Green
-                } else {
-                    Write-Host "  [PYTHON] NAO instalado." -ForegroundColor Yellow
                 }
             }
         },
