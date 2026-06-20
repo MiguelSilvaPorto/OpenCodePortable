@@ -414,15 +414,31 @@ function Run-InitialSetup {
                     
                     if (Test-Path $installerPath) {
                         Write-Host "    Instalando Node.js (aguarde)..." -ForegroundColor Gray
-                        $proc = Start-Process msiexec -ArgumentList "/i `"$installerPath`" /quiet /norestart" -Wait -PassThru
-                        Write-Host "    Codigo de instalacao: $($proc.ExitCode)" -ForegroundColor Gray
                         
-                        # Procurar node.exe em locais comuns (mesmo que o PATH nao tenha atualizado)
+                        # Tentar 1: Instalacao normal (pode falhar sem admin)
+                        $proc = Start-Process msiexec -ArgumentList "/i `"$installerPath`" /quiet /norestart" -Wait -PassThru
+                        $exitCode = $proc.ExitCode
+                        Write-Host "    Codigo: $exitCode" -ForegroundColor Gray
+                        
+                        # Tentar 2: Se falhou (1603 = falta de privilegio), tentar como administrador
+                        if ($exitCode -eq 1603) {
+                            Write-Host "    Tentando instalacao como administrador..." -ForegroundColor Yellow
+                            try {
+                                $proc = Start-Process msiexec -ArgumentList "/i `"$installerPath`" /quiet /norestart" -Wait -PassThru -Verb RunAs
+                                $exitCode = $proc.ExitCode
+                                Write-Host "    Codigo (admin): $exitCode" -ForegroundColor Gray
+                            } catch {
+                                Write-Host "    [INFO] Instalacao como admin negada." -ForegroundColor Yellow
+                            }
+                        }
+                        
+                        # Procurar node.exe em locais comuns (funciona mesmo sem PATH)
                         $nodePaths = @(
                             "$env:ProgramFiles\nodejs\node.exe",
                             "${env:ProgramFiles(x86)}\nodejs\node.exe",
                             "$env:LOCALAPPDATA\Programs\nodejs\node.exe",
-                            "$env:APPDATA\npm\node.exe"
+                            "$env:APPDATA\npm\node.exe",
+                            "$env:SYSTEMROOT\System32\node.exe"
                         )
                         $foundNode = $null
                         foreach ($p in $nodePaths) {
@@ -430,17 +446,16 @@ function Run-InitialSetup {
                         }
                         
                         if ($foundNode) {
-                            # Adicionar ao PATH manualmente
                             $nodeDir = Split-Path $foundNode -Parent
                             $env:Path = "$nodeDir;$env:Path"
                             $nodeInstalled = $true
                             Write-Host "    Node.js encontrado em: $nodeDir" -ForegroundColor Green
                         } else {
-                            # Tentar via PATH normal
                             $env:Path = [Environment]::GetEnvironmentVariable("Path", "Machine") + ";" + [Environment]::GetEnvironmentVariable("Path", "User")
                             $nodeInstalled = $null -ne (Get-Command node -ErrorAction SilentlyContinue)
                             if (-not $nodeInstalled) {
-                                Write-Host "    [INFO] Node.js pode ter sido instalado mas nao esta no PATH." -ForegroundColor Yellow
+                                Write-Host "    [INFO] Node.js nao foi instalado (codigo $exitCode)." -ForegroundColor Yellow
+                                Write-Host "    Baixe e instale manualmente de: https://nodejs.org" -ForegroundColor Yellow
                             }
                         }
                     }
