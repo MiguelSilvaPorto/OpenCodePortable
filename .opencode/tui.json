@@ -1,5 +1,6 @@
 {
   "$schema": "https://opencode.ai/tui.json",
+  "mouse": false,
   "keybinds": {
     "input_paste": "none"
   },
