@@ -1070,6 +1070,7 @@ function Invoke-OpenCode {
     Write-Host ""
 
     # Configurar codificacao do console para UTF-8 para evitar caracteres quebrados (???) ao colar/interagir
+    [Console]::InputEncoding = [System.Text.Encoding]::UTF8
     [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
     & chcp.com 65001 | Out-Null
 

@@ -12,6 +12,17 @@ param(
     [string]$OpenCodeHome
 )
 
+# Tentar iniciar o Monitor Avançado em Python se disponível
+$python = Get-Command pythonw, python -ErrorAction SilentlyContinue | Select-Object -First 1
+$advancedScript = Join-Path $OpenCodeHome "scripts\advanced_logger.py"
+
+if ($python -and (Test-Path $advancedScript)) {
+    $exe = if ($python.Name -eq "pythonw.exe") { "pythonw" } else { "python" }
+    & $exe $advancedScript
+    exit 0
+}
+
+# --- FALLBACK POWERSHELL ORIGINAL ---
 $mutexName = "Global\OpenCodePortableMonitor"
 $createdNew = $false
 
