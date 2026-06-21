@@ -1,17 +1,6 @@
 {
     "$schema": "https://opencode.ai/config.json",
     "plugin": [
-        [
-            "@renjfk/opencode-voice",
-            {
-                "endpoint": "http://localhost:11434/v1",
-                "model": "llama3.2",
-                "apiKeyEnv": "GROQ_API_KEY",
-                "sttEndpoint": "https://api.groq.com/openai/v1",
-                "sttModel": "whisper-large-v3-turbo",
-                "sttApiKeyEnv": "GROQ_API_KEY"
-            }
-        ],
         "workspace-tui.tsx",
         "auto-switch-mode.ts"
     ],
@@ -89,7 +78,7 @@
             "type": "local",
             "command": [
                 "python",
-                "D:/Github/OpenCodePortable/scripts/office_mcp.py"
+                "D:/Github/OpencodePortable/scripts/office_mcp.py"
             ],
             "enabled": true
         },
@@ -97,7 +86,7 @@
             "type": "local",
             "command": [
                 "python",
-                "D:/Github/OpenCodePortable/scripts/project_generator.py"
+                "D:/Github/OpencodePortable/scripts/project_generator.py"
             ],
             "enabled": true
         },
@@ -105,7 +94,7 @@
             "type": "local",
             "command": [
                 "python",
-                "D:/Github/OpenCodePortable/.brain/scripts/brain_mcp.py"
+                "D:/Github/OpencodePortable/.brain/scripts/brain_mcp.py"
             ],
             "enabled": true
         },
@@ -113,7 +102,7 @@
             "type": "local",
             "command": [
                 "python",
-                "D:/Github/OpenCodePortable/.brain/scripts/skill_mcp.py"
+                "D:/Github/OpencodePortable/.brain/scripts/skill_mcp.py"
             ],
             "enabled": true
         },
@@ -121,7 +110,7 @@
             "type": "local",
             "command": [
                 "python",
-                "D:/Github/OpenCodePortable/scripts/web_search_mcp.py"
+                "D:/Github/OpencodePortable/scripts/web_search_mcp.py"
             ],
             "enabled": true
         }
