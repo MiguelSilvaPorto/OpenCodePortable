@@ -204,7 +204,7 @@ function getClipboardText() {
   try {
     let text = "";
     if (process.platform === "win32") {
-      text = execSync("powershell -NoProfile -Command Get-Clipboard", { encoding: "utf-8", timeout: 2000 });
+      text = execSync("powershell -NoProfile -Command \"[Console]::OutputEncoding=[System.Text.UTF8Encoding]::new(); Get-Clipboard\"", { encoding: "utf-8", timeout: 2000 });
     } else if (process.platform === "darwin") {
       text = execSync("pbpaste", { encoding: "utf-8", timeout: 2000 });
     } else {
