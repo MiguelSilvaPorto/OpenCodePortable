@@ -1047,6 +1047,10 @@ function Invoke-OpenCode {
     Write-Host "Iniciando OpenCode em: $ProjectPath" -ForegroundColor Green
     Write-Host ""
 
+    # Configurar codificacao do console para UTF-8 para evitar caracteres quebrados (???) ao colar/interagir
+    [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
+    & chcp.com 65001 | Out-Null
+
     & $exePath $ProjectPath
 
     if ($LASTEXITCODE -ne 0) {
