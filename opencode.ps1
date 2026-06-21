@@ -356,22 +356,44 @@ function Run-InitialSetup {
     $steps = @(
         @{
             name = "SCOOP"
-            check = { $null -ne (Get-Command scoop -ErrorAction SilentlyContinue) }
+            check = { 
+                # Verificar se o scoop está no PATH ou se o diretório padrão dele existe
+                if ($null -ne (Get-Command scoop -ErrorAction SilentlyContinue)) { return $true }
+                $defaultScoopPath = Join-Path $env:USERPROFILE "scoop\shims\scoop.ps1"
+                if (Test-Path $defaultScoopPath) {
+                    $env:PATH = "$(Join-Path $env:USERPROFILE 'scoop\shims');$env:PATH"
+                    return $true
+                }
+                return $false
+            }
             install = {
                 Write-Host "  Instalando Scoop (gerenciador de pacotes)..." -ForegroundColor Gray
                 Write-Host "    Se falhar, as dependencias de voz (whisper, sox) nao serao instaladas." -ForegroundColor Gray
                 try {
-                    Set-ExecutionPolicy RemoteSigned -Scope CurrentUser -Force 2>$null
-                    [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
-                    # Metodo 1: Instalacao via PowerShell
-                    powershell -NoProfile -ExecutionPolicy Bypass -Command "Invoke-RestMethod -Uri https://get.scoop.sh | Invoke-Expression" 2>$null
+                    # Configurar TLS 1.2 e TLS 1.3 explicitamente antes do download
+                    [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12 -bor [Net.SecurityProtocolType]::Tls13
+                    
+                    # Tentar instalar usando PowerShell com Bypass explícito e sem carregar profiles
+                    $installCmd = "Set-ExecutionPolicy RemoteSigned -Scope CurrentUser -Force; [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12; iwr -useb get.scoop.sh | iex"
+                    Start-Process powershell.exe -ArgumentList "-NoProfile -ExecutionPolicy Bypass -Command `"$installCmd`"" -Wait -NoNewWindow
+                    
+                    # Forçar atualização do PATH local imediatamente após a instalação
+                    $scoopShimPath = Join-Path $env:USERPROFILE "scoop\shims"
+                    if (Test-Path $scoopShimPath) {
+                        $env:PATH = "$scoopShimPath;$env:PATH"
+                    }
                 } catch {
-                    Write-Host "  [INFO] Scoop nao instalado (voz desativada). Continuando..." -ForegroundColor Gray
+                    Write-Host "  [INFO] Instalação automática do Scoop falhou: $($_.Exception.Message)" -ForegroundColor Yellow
                 }
-                # Verificar se instalou
-                if (-not (Get-Command scoop -ErrorAction SilentlyContinue)) {
-                    Write-Host "  [INFO] Para usar entrada de voz, instale Scoop manualmente:" -ForegroundColor Gray
-                    Write-Host "    powershell -Command `"Invoke-RestMethod get.scoop.sh | Invoke-Expression`"" -ForegroundColor Gray
+                
+                # Verificar se instalou com sucesso
+                $scoopInstalled = $null -ne (Get-Command scoop -ErrorAction SilentlyContinue)
+                if (-not $scoopInstalled) {
+                    Write-Host "  [AVISO] Scoop nao pode ser configurado automaticamente." -ForegroundColor Yellow
+                    Write-Host "          Por favor, tente rodar este comando em um prompt de Administrador:" -ForegroundColor Yellow
+                    Write-Host "          powershell -ExecutionPolicy Bypass -Command `"iwr -useb get.scoop.sh | iex`"" -ForegroundColor Cyan
+                } else {
+                    Write-Host "  [SCOOP] Scoop instalado e adicionado ao PATH local com sucesso!" -ForegroundColor Green
                 }
             }
         },
