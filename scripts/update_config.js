@@ -42,10 +42,6 @@ if (!cfg) {
     cfg = {
         $schema: "https://opencode.ai/config.json",
         plugin: [
-            [
-                "@renjfk/opencode-voice",
-                defaultVoiceCfg
-            ],
             "workspace-tui.tsx",
             "auto-switch-mode.ts"
         ],
@@ -111,28 +107,13 @@ if (!cfg) {
         cfg.mcp["web-search-mcp"].command = ["python", webSearchMcp];
     }
 
-    // Migrar plugin se GROQ_API_KEY estiver disponível
-    if (process.env.GROQ_API_KEY && cfg.plugin && Array.isArray(cfg.plugin)) {
-        let voicePlugin = cfg.plugin.find(p => Array.isArray(p) && p[0] === "@renjfk/opencode-voice");
-        if (voicePlugin && voicePlugin[1]) {
-            const voiceCfg = voicePlugin[1];
-            if (!voiceCfg.apiKeyEnv || !voiceCfg.sttEndpoint) {
-                voiceCfg.apiKeyEnv = "GROQ_API_KEY";
-                voiceCfg.sttEndpoint = "https://api.groq.com/openai/v1";
-                voiceCfg.sttModel = "whisper-large-v3-turbo";
-                voiceCfg.sttApiKeyEnv = "GROQ_API_KEY";
-            }
-        }
-    }
-    // Migrar modelo antigo/descontinuado no config se existir
+    // Garantir remoção do plugin de voz TUI de opencode.jsonc (ele pertence exclusivamente ao tui.json)
     if (cfg.plugin && Array.isArray(cfg.plugin)) {
-        let voicePlugin = cfg.plugin.find(p => Array.isArray(p) && p[0] === "@renjfk/opencode-voice");
-        if (voicePlugin && voicePlugin[1]) {
-            const voiceCfg = voicePlugin[1];
-            if (voiceCfg.model === "llama3-8b-8192") {
-                voiceCfg.model = "llama-3.1-8b-instant";
-            }
-        }
+        cfg.plugin = cfg.plugin.filter(p => {
+            if (Array.isArray(p) && p[0] === "@renjfk/opencode-voice") return false;
+            if (p === "@renjfk/opencode-voice") return false;
+            return true;
+        });
     }
 }
 
