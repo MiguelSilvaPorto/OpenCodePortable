@@ -368,14 +368,14 @@ function Run-InitialSetup {
             }
             install = {
                 Write-Host "  Instalando Scoop (gerenciador de pacotes)..." -ForegroundColor Gray
-                Write-Host "    Se falhar, as dependencias de voz (whisper, sox) nao serao instaladas." -ForegroundColor Gray
+                Write-Host "    Solicitando permissao para garantir o setup correto do Scoop..." -ForegroundColor Yellow
                 try {
                     # Configurar TLS 1.2 e TLS 1.3 explicitamente antes do download
                     [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12 -bor [Net.SecurityProtocolType]::Tls13
                     
-                    # Tentar instalar usando PowerShell com Bypass explícito e sem carregar profiles
-                    $installCmd = "Set-ExecutionPolicy RemoteSigned -Scope CurrentUser -Force; [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12; iwr -useb get.scoop.sh | iex"
-                    Start-Process powershell.exe -ArgumentList "-NoProfile -ExecutionPolicy Bypass -Command `"$installCmd`"" -Wait -NoNewWindow
+                    # Executar instalacao com privilegios de administrador (UAC Prompt)
+                    $installCmd = "Set-ExecutionPolicy RemoteSigned -Scope CurrentUser -Force; [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12 -bor [Net.SecurityProtocolType]::Tls13; iwr -useb get.scoop.sh | iex"
+                    Start-Process powershell.exe -ArgumentList "-NoProfile -ExecutionPolicy Bypass -Command `"$installCmd`"" -Verb RunAs -Wait
                     
                     # Forçar atualização do PATH local imediatamente após a instalação
                     $scoopShimPath = Join-Path $env:USERPROFILE "scoop\shims"
@@ -463,6 +463,33 @@ function Run-InitialSetup {
                     }
                 } catch {
                     Write-Host "  [INFO] Falha ao instalar winget. Continuando..." -ForegroundColor Gray
+                }
+            }
+        },
+        @{
+            name = "WINDOWS_TERMINAL"
+            check = {
+                if ($null -ne (Get-Command wt -ErrorAction SilentlyContinue)) { return $true }
+                if (Test-Path (Join-Path $env:LOCALAPPDATA "Microsoft\WindowsApps\wt.exe")) { return $true }
+                return $false
+            }
+            install = {
+                Write-Host "  Instalando Windows Terminal para suporte grafico completo..." -ForegroundColor Gray
+                $winget = Get-Command winget -ErrorAction SilentlyContinue
+                if ($winget) {
+                    try {
+                        Write-Host "    Solicitando permissao de Administrador para a instalacao..." -ForegroundColor Yellow
+                        $proc = Start-Process powershell.exe -ArgumentList "-NoProfile -ExecutionPolicy Bypass -Command `"winget install Microsoft.WindowsTerminal --silent --accept-source-agreements --accept-package-agreements`"" -Verb RunAs -Wait -PassThru
+                        if ($proc.ExitCode -eq 0) {
+                            Write-Host "    Windows Terminal instalado com sucesso!" -ForegroundColor Green
+                        } else {
+                            Write-Host "    [AVISO] Falha ao instalar Windows Terminal (codigo: $($proc.ExitCode))." -ForegroundColor Yellow
+                        }
+                    } catch {
+                        Write-Host "    [AVISO] UAC recusado ou falha na instalacao: $($_.Exception.Message)" -ForegroundColor Yellow
+                    }
+                } else {
+                    Write-Host "    [AVISO] winget nao encontrado. Nao foi possivel instalar o Windows Terminal automaticamente." -ForegroundColor Yellow
                 }
             }
         },
