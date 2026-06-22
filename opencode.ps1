@@ -1090,6 +1090,37 @@ function Invoke-OpenCode {
 # FLUXO PRINCIPAL
 # ============================================================================
 
+# Forçar a execução dentro do Windows Terminal (WT) se disponível e rodando em console legado
+if ($env:OS -eq "Windows_NT") {
+    $wtPath = "wt.exe"
+    $wt = Get-Command wt -ErrorAction SilentlyContinue
+    if (-not $wt) {
+        $localAppX = Join-Path $env:LOCALAPPDATA "Microsoft\WindowsApps\wt.exe"
+        if (Test-Path $localAppX) {
+            $wtPath = $localAppX
+            $wt = $true
+        }
+    }
+
+    if (-not $env:WT_SESSION -and $wt) {
+        Write-Host "Reabrendo o OpenCode no Windows Terminal para suporte completo de graficos e clipboard..." -ForegroundColor Cyan
+        Start-Sleep -Milliseconds 500
+        
+        $argList = @()
+        if ($Arguments) {
+            foreach ($arg in $Arguments) {
+                $argList += "`"$arg`""
+            }
+        }
+        
+        $scriptPath = $MyInvocation.MyCommand.Path
+        $wtArgs = "powershell.exe -NoProfile -ExecutionPolicy Bypass -File `"$scriptPath`" $($argList -join ' ')"
+        
+        Start-Process $wtPath -ArgumentList $wtArgs
+        exit 0
+    }
+}
+
 # Configurar ambiente
 $env:PATH = "$OPENCODE_BIN;$env:PATH"
 
