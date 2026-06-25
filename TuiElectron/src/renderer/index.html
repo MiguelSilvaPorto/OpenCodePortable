@@ -445,7 +445,7 @@
       display: none; position: fixed; width: 260px; max-height: 420px;
       background: #1e1e1e; border: 1px solid #2a2a2a; border-radius: var(--radius-lg);
       padding: 6px; box-shadow: 0 8px 32px rgba(0,0,0,0.5); z-index: 1000;
-      display: flex; flex-direction: column;
+      flex-direction: column;
     }
     .auto-dropdown::-webkit-scrollbar { width: 4px; }
     .auto-dropdown::-webkit-scrollbar-track { background: transparent; }
@@ -736,6 +736,7 @@
       cursor: pointer; user-select: none;
     }
     .models-provider-header:hover .models-provider-label { color: var(--fg-primary); }
+    .group-toggle { margin-left: auto; flex-shrink: 0; }
     .models-provider-chevron {
       width: 12px; height: 12px; transition: transform 0.15s; color: var(--fg-muted);
       flex-shrink: 0;
@@ -828,6 +829,55 @@
       background-repeat: no-repeat; background-position: 10px center; background-size: 14px;
     }
     .provider-search-input::placeholder { color: var(--fg-muted); }
+
+    /* Modal */
+    .modal-overlay {
+      display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.6);
+      z-index: 10000; justify-content: center; align-items: center;
+    }
+    .modal-overlay.open { display: flex; }
+    .modal-box {
+      background: #1a1a1a; border: 1px solid #2a2a2a; border-radius: var(--radius-lg);
+      padding: 24px; width: 420px; max-height: 80vh; overflow-y: auto;
+      box-shadow: 0 16px 64px rgba(0,0,0,0.5);
+    }
+    .modal-title { font-size: 16px; font-weight: 600; color: var(--fg-primary); margin-bottom: 4px; }
+    .modal-desc { font-size: 12px; color: var(--fg-secondary); margin-bottom: 16px; }
+    .modal-list { list-style: none; max-height: 300px; overflow-y: auto; margin-bottom: 16px; }
+    .modal-list::-webkit-scrollbar { width: 4px; }
+    .modal-list::-webkit-scrollbar-thumb { background: #444; border-radius: 2px; }
+    .modal-list-item {
+      display: flex; align-items: center; gap: 10px; padding: 8px 10px;
+      border-radius: var(--radius-md); cursor: pointer; transition: background 0.1s;
+    }
+    .modal-list-item:hover { background: rgba(255,255,255,0.06); }
+    .modal-list-item.selected { background: rgba(61,220,132,0.1); border: 1px solid rgba(61,220,132,0.3); }
+    .modal-list-icon {
+      width: 28px; height: 28px; border-radius: var(--radius-sm);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 12px; font-weight: 700; flex-shrink: 0;
+    }
+    .modal-list-name { font-size: 13px; color: var(--fg-primary); }
+    .modal-list-desc { font-size: 11px; color: var(--fg-secondary); }
+    .modal-input-group { margin-bottom: 16px; }
+    .modal-input-label { font-size: 12px; font-weight: 500; color: var(--fg-secondary); margin-bottom: 6px; display: block; }
+    .modal-input {
+      width: 100%; background: var(--bg-input); border: 1px solid var(--bg-input-border);
+      border-radius: var(--radius-md); padding: 10px 12px; color: var(--fg-primary);
+      font-size: 13px; font-family: var(--font-family); outline: none; box-sizing: border-box;
+    }
+    .modal-input:focus { border-color: var(--border-input); }
+    .modal-input::placeholder { color: var(--fg-muted); }
+    .modal-actions { display: flex; justify-content: flex-end; gap: 8px; }
+    .modal-btn {
+      padding: 8px 16px; border-radius: var(--radius-md); font-size: 13px;
+      font-family: var(--font-family); cursor: pointer; border: none;
+    }
+    .modal-btn-primary { background: var(--fg-accent); color: #000; font-weight: 500; }
+    .modal-btn-primary:hover { opacity: 0.9; }
+    .modal-btn-primary:disabled { opacity: 0.4; cursor: not-allowed; }
+    .modal-btn-cancel { background: none; border: 1px solid var(--bg-input-border); color: var(--fg-secondary); }
+    .modal-btn-cancel:hover { background: rgba(255,255,255,0.06); color: var(--fg-primary); }
 
     .settings-panel-icon {
       position: fixed; top: 10px; right: 14px; z-index: 5001;
@@ -1126,6 +1176,10 @@
           <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M2 8h12M8 2v12M5 5l6 6M11 5l-6 6"></path></svg>
           Providers
         </li>
+        <li class="settings-nav-item" data-panel="opendesign">
+          <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><rect x="2" y="2" width="12" height="12" rx="2"></rect><path d="M6 6h4M6 8h4M6 10h2"></path></svg>
+          Open Design
+        </li>
         <li class="settings-nav-item" data-panel="cloud-agents">
           <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M4 10a4 4 0 0 1-.8-7.9A5 5 0 0 1 14 6a3 3 0 0 1-1 5.8"></path></svg>
           Cloud Agents
@@ -1321,9 +1375,90 @@
       <div class="settings-panel" data-panel="providers" style="display:none;">
         <h2 class="settings-section-title">Providers</h2>
         <p style="font-size:12px;color:var(--fg-secondary);margin:0 0 16px 0;">Conecte provedores de IA para acessar modelos.</p>
-        <input type="text" class="provider-search-input" id="provider-search" placeholder="Buscar provedores...">
+        <div style="display:flex;gap:8px;align-items:center;margin-bottom:16px;">
+          <input type="text" class="provider-search-input" id="provider-search" placeholder="Buscar provedores..." style="margin:0;">
+          <button class="models-connect-btn" id="connect-provider-btn" style="white-space:nowrap;">
+            <svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><line x1="6" y1="2" x2="6" y2="10"/><line x1="2" y1="6" x2="10" y2="6"/></svg>
+            Conectar provedor
+          </button>
+        </div>
         <div id="providers-connected-section"></div>
         <div id="providers-available-section"></div>
+      </div>
+
+      <!-- Connect Provider Modal -->
+      <div class="modal-overlay" id="connect-modal">
+        <div class="modal-box">
+          <div class="modal-title">Conectar provedor</div>
+          <div class="modal-desc">Selecione um provedor e insira sua API key.</div>
+          <ul class="modal-list" id="modal-provider-list"></ul>
+          <div class="modal-input-group" id="modal-key-group" style="display:none;">
+            <label class="modal-input-label">API Key</label>
+            <input type="password" class="modal-input" id="modal-api-key" placeholder="sk-...">
+          </div>
+          <div class="modal-actions">
+            <button class="modal-btn modal-btn-cancel" id="modal-cancel">Cancelar</button>
+            <button class="modal-btn modal-btn-primary" id="modal-confirm" disabled>Conectar</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Open Design Panel -->
+      <div class="settings-panel" data-panel="opendesign" style="display:none;">
+        <h2 class="settings-section-title">Open Design</h2>
+        <p style="font-size:12px;color:var(--fg-secondary);margin:0 0 16px 0;">Preview em tempo real com Open Design.</p>
+
+        <div class="provider-card" id="od-status-card" style="margin-bottom:16px;">
+          <div class="provider-card-info">
+            <div class="provider-card-icon" style="background:#6366f122;color:#6366f1;">OD</div>
+            <div class="provider-card-text">
+              <div class="provider-card-name">Open Design Daemon</div>
+              <div class="provider-card-desc" id="od-status-text">Verificando conexao...</div>
+            </div>
+          </div>
+          <span class="provider-card-status" id="od-status-badge">...</span>
+        </div>
+
+        <div class="provider-card" id="local-server-card" style="margin-bottom:16px;">
+          <div class="provider-card-info">
+            <div class="provider-card-icon" style="background:#f59e0b22;color:#f59e0b;">LS</div>
+            <div class="provider-card-text">
+              <div class="provider-card-name">Servidor Local (Preview)</div>
+              <div class="provider-card-desc" id="local-server-status">Parado</div>
+            </div>
+          </div>
+          <button class="models-connect-btn" id="local-server-toggle" onclick="window._toggleLocalServer()">Iniciar</button>
+        </div>
+
+        <div style="margin-bottom:16px;">
+          <div class="models-section-title" style="font-size:12px;font-weight:600;color:var(--fg-secondary);margin-bottom:8px;">Projetos</div>
+          <div id="od-projects-list"></div>
+        </div>
+
+        <div id="od-project-files" style="display:none;">
+          <div class="models-section-title" style="font-size:12px;font-weight:600;color:var(--fg-secondary);margin-bottom:8px;">Arquivos do Projeto</div>
+          <div id="od-files-list"></div>
+        </div>
+
+        <div style="margin-top:16px;">
+          <button class="models-connect-btn" id="od-refresh-btn">
+            <svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M1 6a5 5 0 0 1 9-3M11 6a5 5 0 0 1-9 3"/><path d="M10 1v3h3M2 11v-3H0"/></svg>
+            Atualizar
+          </button>
+          <button class="models-connect-btn" id="od-start-watcher-btn" style="margin-left:8px;">
+            <svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><circle cx="6" cy="6" r="4"></circle><path d="M6 4v2l2 1"></path></svg>
+            Iniciar Watcher
+          </button>
+          <button class="models-connect-btn" id="od-stop-watcher-btn" style="margin-left:8px;display:none;">
+            <svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><rect x="3" y="3" width="6" height="6" rx="1"></rect></svg>
+            Parar Watcher
+          </button>
+        </div>
+
+        <div id="od-preview-section" style="display:none;margin-top:16px;">
+          <div class="models-section-title" style="font-size:12px;font-weight:600;color:var(--fg-secondary);margin-bottom:8px;">Preview em Tempo Real</div>
+          <iframe id="od-preview-frame" style="width:100%;height:400px;border:1px solid var(--bg-input-border);border-radius:var(--radius-md);background:white;"></iframe>
+        </div>
       </div>
 
       <!-- Default placeholder panels -->
@@ -1359,14 +1494,54 @@
       getProviders: async () => [],
     };
 
+    // ===== LOCAL SERVER TOGGLE =====
+    window._toggleLocalServer = async function() {
+      const statusText = document.getElementById('local-server-status');
+      const btn = document.getElementById('local-server-toggle');
+      if (!btn) return;
+      const origText = btn.textContent;
+      btn.textContent = '...';
+      btn.disabled = true;
+      try {
+        const status = await api.getLocalServerStatus();
+        if (status.running) {
+          await api.stopLocalServer();
+          if (statusText) statusText.textContent = 'Parado';
+          btn.textContent = 'Iniciar';
+        } else {
+          const result = await api.startLocalServer();
+          if (result.success && result.url) {
+            if (statusText) statusText.textContent = 'Rodando em ' + result.url;
+            btn.textContent = 'Parar';
+          } else {
+            if (statusText) statusText.textContent = result.error || 'Falha ao iniciar';
+            btn.textContent = origText;
+          }
+        }
+      } catch (err) {
+        console.error('Local server toggle error:', err);
+        if (statusText) statusText.textContent = 'Erro: ' + (err.message || err);
+        btn.textContent = origText;
+      }
+      btn.disabled = false;
+    };
+
     // ===== STATE =====
     const STORAGE_KEY = 'cursor-agent-conversations';
     let conversations = [];
     let activeConvId = null;
     let currentTool = 'Composer';
+    let currentModel = 'opencode-go/minimax-m3';
     let inputMoved = false;
     let isStreaming = false;
     let voiceState = 'idle'; // idle, listening, processing, speaking
+
+    // ===== ENVIRONMENT DETECTION =====
+    const isFileProtocol = window.location.protocol === 'file:';
+    const isBrowserMode = window.location.hostname === '127.0.0.1' || window.location.hostname === 'localhost';
+    const isElectronApp = !!(window.electronAPI && window.electronAPI.executePrompt && !window.electronAPI.startLocalServer);
+    const isOpenDesign = isFileProtocol;
+    const isChatCapable = isBrowserMode || isElectronApp;
 
     function uid() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 8); }
     function shortTime(ts) {
@@ -1473,6 +1648,25 @@
     const chatInputBottom = document.getElementById('chat-input-bottom');
     const inputContainer = document.getElementById('input-container');
     const convListEl = document.getElementById('conv-list');
+
+    // ===== OD EDITOR MODE BANNER =====
+    if (isOpenDesign) {
+      const banner = document.createElement('div');
+      banner.id = 'od-editor-banner';
+      banner.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:9999;background:linear-gradient(90deg,#0d9488,#0ea5e9);color:#fff;padding:8px 16px;font-size:12px;font-family:system-ui;display:flex;align-items:center;gap:12px;box-shadow:0 2px 8px rgba(0,0,0,0.3);';
+      banner.innerHTML = `
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>
+        <span style="flex:1"><b>Modo Editor Open Design</b> — Ferramentas de editor ativas (1ª/2ª janela, zoom 100%). Para chat AI, abra a versão browser.</span>
+        <a href="http://127.0.0.1:3456/" target="_blank" style="background:rgba(255,255,255,0.2);color:#fff;padding:4px 10px;border-radius:4px;text-decoration:none;font-weight:500;">Abrir versão browser</a>
+        <button id="od-banner-close" style="background:transparent;border:none;color:#fff;cursor:pointer;font-size:16px;padding:0 4px;">×</button>
+      `;
+      document.body.appendChild(banner);
+      document.body.style.paddingTop = '36px';
+      setTimeout(() => {
+        const close = document.getElementById('od-banner-close');
+        if (close) close.onclick = () => { banner.remove(); document.body.style.paddingTop = '0'; };
+      }, 100);
+    }
     function renderConvList() {
       const listEl = convListEl;
       if (!listEl) return;
@@ -1661,15 +1855,27 @@
 
       try {
         const agent = agentMap[currentTool] || 'composer';
-        const result = await api.executePrompt(text, agent);
+        const model = currentModel || 'opencode-go/minimax-m3';
+
+        if (!isChatCapable) {
+          removeThinkingEl();
+          const notice = '**Modo Editor Open Design** — As ferramentas de editor estão ativas (1ª/2ª janela, zoom, etc.). Para executar prompts de AI, abra a versão browser: **http://127.0.0.1:3456** ou use o chat nativo do Open Design (Composer/Plan/Build).';
+          conv.messages.push({ role: 'agent', content: notice, timestamp: Date.now() });
+          conv.updatedAt = Date.now();
+          saveState();
+          appendMessageEl('agent', notice);
+          return;
+        }
+
+        const result = await api.executePrompt(text, agent, model);
 
         if (result.error) throw new Error(result.error);
 
-        let response = (result.stdout || '').trim();
+        let response = (result.response || '').trim();
+        if (!response) response = (result.stdout || '').trim();
         if (!response) response = (result.stderr || '').trim();
         if (!response) response = 'No response from agent.';
 
-        // Strip ANSI escape codes from TUI output
         response = response.replace(/\x1b\[[0-9;]*[a-zA-Z]/g, '').trim();
 
         conv.messages.push({ role: 'agent', content: response, timestamp: Date.now() });
@@ -2000,6 +2206,9 @@
         settingsContent.querySelectorAll('.settings-panel').forEach(p => p.style.display = 'none');
         const target = settingsContent.querySelector(`.settings-panel[data-panel="${panel}"]`);
         if (target) target.style.display = '';
+        if (panel === 'models') renderModels();
+        if (panel === 'providers') renderProviders();
+        if (panel === 'opendesign') { checkOdStatus(); checkLocalServerStatus(); }
       });
     });
 
@@ -2007,6 +2216,7 @@
     document.addEventListener('keydown', (e) => {
       if (e.ctrlKey && e.key === ',') { e.preventDefault(); openSettings(); }
       if (e.key === 'Escape' && settingsScreen.classList.contains('visible')) closeSettings();
+      if (e.key === 'Escape') document.getElementById('connect-modal')?.classList.remove('open');
     });
 
     // ===== MODELS PANEL =====
@@ -2018,7 +2228,11 @@
 
     async function loadModelsFromConfig() {
       try {
-        const [connectedIds, configData] = await Promise.all([api.getProviders(), api.getModelsConfig()]);
+        const providersData = await api.getProviders();
+        const configData = await api.getModelsConfig();
+        const connectedIds = Array.isArray(providersData)
+          ? providersData.filter(p => p.connected).map(p => p.id)
+          : [];
         modelsProviders = {};
         defaultModelId = configData.defaultModel;
         smallModelId = configData.smallModel;
@@ -2073,9 +2287,21 @@
         const header = document.createElement('div');
         header.className = 'models-provider-header';
         const enabledCount = prov.models.filter(m => m.enabled).length;
+        const allEnabled = enabledCount === prov.models.length && prov.models.length > 0;
         header.innerHTML = `<svg class="models-provider-chevron" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="4,3 8,6 4,9"></polyline></svg>
           <span class="models-provider-label">${name}</span>
-          <span class="models-provider-count">${enabledCount}/${prov.models.length}</span>`;
+          <span class="models-provider-count">${enabledCount}/${prov.models.length}</span>
+          <label class="toggle-switch group-toggle" onclick="event.stopPropagation()"><input type="checkbox" ${allEnabled ? 'checked' : ''} data-group="${name}"><span class="toggle-slider"></span></label>`;
+        header.querySelector('.group-toggle input')?.addEventListener('change', (e) => {
+          const groupName = e.target.dataset.group;
+          const prov2 = modelsProviders[groupName];
+          if (prov2) {
+            prov2.models.forEach(m => m.enabled = e.target.checked);
+            saveModelStates();
+            renderModels(filter);
+            renderAutoModels();
+          }
+        });
         header.addEventListener('click', () => {
           collapsedGroups[name] = !collapsedGroups[name];
           group.classList.toggle('collapsed');
@@ -2105,36 +2331,15 @@
         group.appendChild(list);
         container.appendChild(group);
       });
-    renderAutoModels();
+    }
 
     // ===== PROVIDERS PANEL =====
-    const allProviders = [
-      { id: 'opencode-zen', name: 'OpenCode Zen', desc: 'Modelos curados com pay-per-token', icon: 'Z', color: '#3ddc84' },
-      { id: 'opencode-go', name: 'OpenCode Go', desc: 'Assinacao mensal com modelos premium', icon: 'G', color: '#4a9eff' },
-      { id: 'nvidia', name: 'NVIDIA', desc: 'build.nvidia.com — modelos open-source', icon: 'N', color: '#76b900' },
-      { id: 'openrouter', name: 'OpenRouter', desc: 'Gateway multi-provedor', icon: 'O', color: '#ff6b35' },
-      { id: 'anthropic', name: 'Anthropic', desc: 'Claude Sonnet, Opus, Haiku', icon: 'A', color: '#d4a574' },
-      { id: 'openai', name: 'OpenAI', desc: 'GPT-5, GPT-4, o1, o3', icon: 'O', color: '#10a37f' },
-      { id: 'github-copilot', name: 'GitHub Copilot', desc: 'Assinatura Copilot', icon: 'C', color: '#6e40c9' },
-      { id: 'groq', name: 'Groq', desc: 'Inferencia ultrarapida', icon: 'G', color: '#f55036' },
-      { id: 'deepseek', name: 'DeepSeek', desc: 'DeepSeek V4 models', icon: 'D', color: '#4d6bfe' },
-      { id: 'google-vertex', name: 'Google Vertex AI', desc: 'Gemini, PaLM via GCP', icon: 'G', color: '#4285f4' },
-      { id: 'amazon-bedrock', name: 'Amazon Bedrock', desc: 'Modelos via AWS', icon: 'A', color: '#ff9900' },
-      { id: 'xai', name: 'xAI', desc: 'Grok models', icon: 'X', color: '#1d9bf0' },
-      { id: 'fireworks', name: 'Fireworks AI', desc: 'Modelos open-source', icon: 'F', color: '#ff4500' },
-      { id: 'together', name: 'Together AI', desc: 'Modelos open-source', icon: 'T', color: '#6366f1' },
-      { id: 'cerebras', name: 'Cerebras', desc: 'Inferencia ultrarapida', icon: 'C', color: '#00b4d8' },
-      { id: 'ollama', name: 'Ollama (local)', desc: 'Modelos locais via Ollama', icon: 'O', color: '#888' },
-      { id: 'lmstudio', name: 'LM Studio', desc: 'Modelos locais via LM Studio', icon: 'L', color: '#888' },
-      { id: 'huggingface', name: 'Hugging Face', desc: 'Inference Providers', icon: 'H', color: '#ffd21e' },
-      { id: 'cloudflare', name: 'Cloudflare Workers AI', desc: 'Modelos na edge', icon: 'C', color: '#f48120' },
-      { id: 'moonshot', name: 'Moonshot AI', desc: 'Kimi models', icon: 'M', color: '#6366f1' },
-    ];
+    let allProviders = [];
 
     async function loadProvidersFromOpenCode() {
       try {
-        const connectedIds = await api.getProviders();
-        allProviders.forEach(p => { p.connected = connectedIds.includes(p.id); });
+        const data = await api.getProviders();
+        if (Array.isArray(data) && data.length > 0) allProviders = data;
       } catch {}
     }
 
@@ -2173,11 +2378,12 @@
     }
 
     function createProviderCard(p, isConnected) {
+      const iconLetter = p.name ? p.name.charAt(0).toUpperCase() : p.id.charAt(0).toUpperCase();
       const card = document.createElement('div');
       card.className = 'provider-card';
       card.innerHTML = `
         <div class="provider-card-info">
-          <div class="provider-card-icon" style="background:${p.color}22;color:${p.color};">${p.icon}</div>
+          <div class="provider-card-icon" style="background:${p.color}22;color:${p.color};">${iconLetter}</div>
           <div class="provider-card-text">
             <div class="provider-card-name">${p.name}</div>
             <div class="provider-card-desc">${p.desc}</div>
@@ -2187,20 +2393,64 @@
           ? `<span class="provider-card-status connected">Conectado</span><button class="provider-disconnect-btn" data-id="${p.id}">Desconectar</button>`
           : `<button class="provider-connect-btn" data-id="${p.id}">Conectar</button>`
         }`;
-      const btn = card.querySelector('.provider-connect-btn, .provider-disconnect-btn');
-      btn?.addEventListener('click', () => {
-        const prov = allProviders.find(x => x.id === p.id);
-        if (prov) { prov.connected = !prov.connected; renderProviders(document.getElementById('provider-search')?.value || ''); }
+      card.querySelector('.provider-connect-btn')?.addEventListener('click', (e) => {
+        e.stopPropagation();
+        openConnectModal(p);
+      });
+      card.querySelector('.provider-disconnect-btn')?.addEventListener('click', async (e) => {
+        e.stopPropagation();
+        await api.disconnectProvider(p.id);
+        renderProviders(document.getElementById('provider-search')?.value || '');
       });
       return card;
     }
 
+    // ===== CONNECT MODAL =====
+    let selectedProvider = null;
+
+    function openConnectModal(provider) {
+      selectedProvider = provider;
+      const modal = document.getElementById('connect-modal');
+      const list = document.getElementById('modal-provider-list');
+      const keyGroup = document.getElementById('modal-key-group');
+      const keyInput = document.getElementById('modal-api-key');
+      const confirmBtn = document.getElementById('modal-confirm');
+      list.innerHTML = '';
+      keyGroup.style.display = 'none';
+      keyInput.value = '';
+      confirmBtn.disabled = true;
+
+      const item = document.createElement('div');
+      item.className = 'modal-list-item selected';
+      item.innerHTML = `<div class="modal-list-icon" style="background:${provider.color}22;color:${provider.color};">${provider.name.charAt(0)}</div><div><div class="modal-list-name">${provider.name}</div><div class="modal-list-desc">${provider.desc}</div></div>`;
+      list.appendChild(item);
+      keyGroup.style.display = 'block';
+      keyInput.focus();
+      modal.classList.add('open');
+    }
+
+    document.getElementById('modal-cancel')?.addEventListener('click', () => {
+      document.getElementById('connect-modal')?.classList.remove('open');
+      selectedProvider = null;
+    });
+    document.getElementById('modal-api-key')?.addEventListener('input', (e) => {
+      document.getElementById('modal-confirm').disabled = !e.target.value.trim();
+    });
+    document.getElementById('modal-confirm')?.addEventListener('click', async () => {
+      if (!selectedProvider) return;
+      const key = document.getElementById('modal-api-key')?.value.trim();
+      if (!key) return;
+      await api.connectProvider(selectedProvider.id, key);
+      document.getElementById('connect-modal')?.classList.remove('open');
+      selectedProvider = null;
+      renderProviders(document.getElementById('provider-search')?.value || '');
+    });
+    document.getElementById('connect-provider-btn')?.addEventListener('click', () => {
+      openConnectModal({ id: 'custom', name: 'Provedor Customizado', desc: 'Insira a API key manualmente', color: '#666' });
+    });
     document.getElementById('provider-search')?.addEventListener('input', (e) => {
       renderProviders(e.target.value);
     });
-
-    renderProviders();
-    }
 
     document.getElementById('models-search')?.addEventListener('input', (e) => {
       renderModels(e.target.value);
@@ -2242,6 +2492,148 @@
     }
     renderAutoModels();
 
+    // ===== OPEN DESIGN INTEGRATION =====
+    let odConnected = false;
+    let odProjects = [];
+    let odSelectedProject = null;
+    let odWatcherActive = false;
+
+    async function checkOdStatus() {
+      const statusText = document.getElementById('od-status-text');
+      const statusBadge = document.getElementById('od-status-badge');
+      try {
+        const status = await api.odGetDaemonStatus();
+        if (status.connected) {
+          odConnected = true;
+          odProjects = status.projects || [];
+          if (statusText) statusText.textContent = `Conectado na porta ${status.port}`;
+          if (statusBadge) { statusBadge.textContent = 'Conectado'; statusBadge.className = 'provider-card-status connected'; }
+          renderOdProjects();
+        } else {
+          odConnected = false;
+          if (statusText) statusText.textContent = status.error || 'Daemon nao encontrado';
+          if (statusBadge) { statusBadge.textContent = 'Desconectado'; statusBadge.className = 'provider-card-status available'; }
+        }
+      } catch (err) {
+        odConnected = false;
+        if (statusText) statusText.textContent = 'Erro ao conectar';
+        if (statusBadge) { statusBadge.textContent = 'Erro'; statusBadge.className = 'provider-card-status available'; }
+      }
+    }
+
+    async function checkLocalServerStatus() {
+      const statusText = document.getElementById('local-server-status');
+      const toggleBtn = document.getElementById('local-server-toggle');
+      try {
+        const status = await api.getLocalServerStatus();
+        if (status.running) {
+          if (statusText) statusText.textContent = 'Rodando em http://127.0.0.1:' + status.port;
+          if (toggleBtn) { toggleBtn.textContent = 'Parar'; }
+        } else {
+          if (statusText) statusText.textContent = 'Parado';
+          if (toggleBtn) { toggleBtn.textContent = 'Iniciar'; }
+        }
+      } catch {}
+    }
+
+    function renderOdProjects() {
+      const list = document.getElementById('od-projects-list');
+      if (!list) return;
+      list.innerHTML = '';
+      odProjects.forEach(p => {
+        const card = document.createElement('div');
+        card.className = 'provider-card';
+        card.style.cursor = 'pointer';
+        const isLinked = p.metadata?.linkedDir;
+        card.innerHTML = `
+          <div class="provider-card-info">
+            <div class="provider-card-icon" style="background:#6366f122;color:#6366f1;">${p.name.charAt(0)}</div>
+            <div class="provider-card-text">
+              <div class="provider-card-name">${p.name}</div>
+              <div class="provider-card-desc">${isLinked ? 'Vinculado: ' + p.metadata.linkedDir.split('\\').pop() : 'Sem diretorio vinculado'}</div>
+            </div>
+          </div>
+          <span class="provider-card-status ${p.status?.value === 'succeeded' ? 'connected' : 'available'}">${p.status?.value || 'unknown'}</span>`;
+        card.addEventListener('click', () => {
+          odSelectedProject = p;
+          document.querySelectorAll('#od-projects-list .provider-card').forEach(c => c.style.border = '');
+          card.style.border = '1px solid var(--fg-accent)';
+          loadOdProjectFiles(p.id);
+        });
+        list.appendChild(card);
+      });
+    }
+
+    async function loadOdProjectFiles(projectId) {
+      const filesDiv = document.getElementById('od-project-files');
+      const filesList = document.getElementById('od-files-list');
+      if (!filesDiv || !filesList) return;
+      filesDiv.style.display = 'block';
+      filesList.innerHTML = '<div style="color:var(--fg-muted);font-size:12px;">Carregando...</div>';
+      try {
+        const result = await api.odGetProjectFiles(projectId);
+        filesList.innerHTML = '';
+        const files = result.files || result;
+        if (Array.isArray(files)) {
+          files.forEach(f => {
+            const item = document.createElement('div');
+            item.className = 'provider-card';
+            item.style.cursor = 'pointer';
+            item.innerHTML = `<div class="provider-card-info"><div class="provider-card-text"><div class="provider-card-name" style="font-size:12px;">${f.name || f.path}</div><div class="provider-card-desc">${f.size || ''} bytes</div></div></div>`;
+            item.addEventListener('click', () => previewOdFile(projectId, f.name || f.path));
+            filesList.appendChild(item);
+          });
+        }
+      } catch (err) {
+        filesList.innerHTML = `<div style="color:var(--fg-muted);font-size:12px;">Erro: ${err.message}</div>`;
+      }
+    }
+
+    async function previewOdFile(projectId, fileName) {
+      const previewSection = document.getElementById('od-preview-section');
+      const frame = document.getElementById('od-preview-frame');
+      if (!previewSection || !frame) return;
+      try {
+        const result = await api.odReadFile(projectId, fileName);
+        if (result.content) {
+          previewSection.style.display = 'block';
+          // Use local server URL if running, otherwise use data URI
+          const serverStatus = await api.getLocalServerStatus();
+          if (serverStatus.running) {
+            frame.src = serverStatus.url;
+          } else {
+            frame.srcdoc = result.content;
+          }
+        }
+      } catch {}
+    }
+
+    document.getElementById('od-refresh-btn')?.addEventListener('click', () => checkOdStatus());
+    document.getElementById('od-start-watcher-btn')?.addEventListener('click', async () => {
+      if (!odSelectedProject) { alert('Selecione um projeto primeiro.'); return; }
+      const result = await api.odStartFileWatcher(odSelectedProject.id);
+      if (result.success) {
+        odWatcherActive = true;
+        document.getElementById('od-start-watcher-btn').style.display = 'none';
+        document.getElementById('od-stop-watcher-btn').style.display = '';
+      }
+    });
+    document.getElementById('od-stop-watcher-btn')?.addEventListener('click', async () => {
+      await api.odStopFileWatcher();
+      odWatcherActive = false;
+      document.getElementById('od-start-watcher-btn').style.display = '';
+      document.getElementById('od-stop-watcher-btn').style.display = 'none';
+    });
+
+    api.onFileChanged?.((event) => {
+      if (odSelectedProject && event.path) {
+        loadOdProjectFiles(odSelectedProject.id);
+        if (event.path.endsWith('.html') || event.path.endsWith('.htm')) {
+          previewOdFile(odSelectedProject.id, event.path);
+        }
+      }
+    });
+
     // ===== INIT =====
     loadState();
     if (conversations.length === 0) {
@@ -2251,6 +2643,8 @@
     renderMessages();
     renderModels();
     renderAutoModels();
+    checkOdStatus();
+    checkLocalServerStatus();
     if (textarea) textarea.focus();
   </script>
 

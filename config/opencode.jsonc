@@ -71,22 +71,14 @@
             }
         }
     },
-    "model": "nvidia-router",
-    "small_model": "nvidia-router",
+    "model": "opencode-go/minimax-m3",
+    "small_model": "opencode-go/minimax-m3",
     "mcp": {
-        "office-mcp": {
-            "type": "local",
-            "command": [
-                "python",
-                "D:/Github/OpencodePortable/scripts/office_mcp.py"
-            ],
-            "enabled": true
-        },
         "project-mcp": {
             "type": "local",
             "command": [
                 "python",
-                "D:/Github/OpencodePortable/scripts/project_generator.py"
+                "D:/Miguel/Github/OpenCodePortable/scripts/project_generator.py"
             ],
             "enabled": true
         },
@@ -94,7 +86,7 @@
             "type": "local",
             "command": [
                 "python",
-                "D:/Github/OpencodePortable/.brain/scripts/brain_mcp.py"
+                "D:/Miguel/Github/OpenCodePortable/.brain/scripts/brain_mcp.py"
             ],
             "enabled": true
         },
@@ -102,7 +94,7 @@
             "type": "local",
             "command": [
                 "python",
-                "D:/Github/OpencodePortable/.brain/scripts/skill_mcp.py"
+                "D:/Miguel/Github/OpenCodePortable/.brain/scripts/skill_mcp.py"
             ],
             "enabled": true
         },
@@ -110,7 +102,15 @@
             "type": "local",
             "command": [
                 "python",
-                "D:/Github/OpencodePortable/scripts/web_search_mcp.py"
+                "D:/Miguel/Github/OpenCodePortable/scripts/web_search_mcp.py"
+            ],
+            "enabled": true
+        },
+        "office-mcp": {
+            "type": "local",
+            "command": [
+                "python",
+                "D:/Miguel/Github/OpenCodePortable/scripts/office_mcp.py"
             ],
             "enabled": true
         }

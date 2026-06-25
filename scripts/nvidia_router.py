@@ -34,10 +34,11 @@ def _load_nvidia_key():
     if key:
         return key
 
-    # Try .env file in project root
+    # Try .env file in project root or config/
     for env_path in [
         os.path.join(os.path.dirname(__file__), '..', '.env'),
         os.path.join(os.path.dirname(__file__), '..', '.env.local'),
+        os.path.join(os.path.dirname(__file__), '..', 'config', '.env'),
     ]:
         full = os.path.normpath(env_path)
         if os.path.isfile(full):
