@@ -2908,9 +2908,9 @@ def add_shape_pptx(file_path: str, slide_index: int, shape_type: str, left_inch:
         "rectangle": MSO_SHAPE.RECTANGLE,
         "rounded_rectangle": MSO_SHAPE.ROUNDED_RECTANGLE,
         "oval": MSO_SHAPE.OVAL,
-        "arrow_right": MSO_SHAPE.RIGHT_ARROW,
-        "arrow_left": MSO_SHAPE.LEFT_ARROW,
-        "line": MSO_SHAPE.LINE,
+        "arrow_right": getattr(MSO_SHAPE, "RIGHT_ARROW", MSO_SHAPE.RECTANGLE),
+        "arrow_left": getattr(MSO_SHAPE, "LEFT_ARROW", MSO_SHAPE.RECTANGLE),
+        "line": getattr(MSO_SHAPE, "STRAIGHT_CONNECTOR", MSO_SHAPE.RECTANGLE),
     }
     mso = shape_map.get(shape_type)
     if not mso:
