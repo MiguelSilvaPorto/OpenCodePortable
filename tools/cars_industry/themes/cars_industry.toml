@@ -1,0 +1,56 @@
+# theme.toml — Indústria Automobilística Global
+# Tom: corporativo, analítico, baseado em dados
+# Inspiração: relatórios anuais OEM, McKinsey, BloombergNEF
+
+[theme]
+name = "Indústria Automobilística Global"
+subtitle = "Panorama 2024-2025 e Tendências"
+tone = "corporate_analytical"
+
+[colors]
+background = "#FFFFFF"
+text_primary = "#0F172A"
+text_secondary = "#64748B"
+text_muted = "#94A3B8"
+accent = "#DC2626"
+accent_secondary = "#2563EB"
+highlight = "#F59E0B"
+positive = "#16A34A"
+negative = "#DC2626"
+divider = "#E2E8F0"
+surface = "#F8FAFC"
+
+[fonts]
+title_family = "Inter"
+title_weight = "700"
+body_family = "Inter"
+body_weight = "400"
+
+[font_sizes]
+cover_title = 60
+cover_subtitle = 24
+slide_title = 36
+slide_subtitle = 20
+body = 18
+body_small = 14
+caption = 11
+big_number = 96
+footer = 9
+min_size = 14
+
+[layout]
+aspect_ratio = "16:9"
+slide_width_in = 13.333
+slide_height_in = 7.5
+margin_x_in = 0.6
+margin_y_in = 0.5
+
+[content]
+images_source = "Unsplash / Pexels (free)"
+images_style = "real_photo"
+narrative = "what_is_what_could_be"
+n_languages = 1
+
+[footer]
+left = "Indústria Automobilística Global"
+right_format = "{n} / {total}"

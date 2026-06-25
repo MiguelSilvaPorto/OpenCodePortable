@@ -22,11 +22,13 @@ from datetime import datetime
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from brain_checkpoint import BrainCheckpoint
+from tui_sync import sync_once
 
 # Configuração
 BRAIN_DIR = os.path.join(os.getcwd(), ".brain")
 STATUS_FILE = os.path.join(BRAIN_DIR, "brain_status.json")
 CHECK_INTERVAL = 30  # segundos
+TUI_SYNC_INTERVAL = 60  # segundos - sync do TUI SQLite
 MAX_FAILURES = 3
 
 
@@ -38,11 +40,13 @@ class BrainMonitor:
         self.running = True
         self.checkpoints_saved = 0
         self.last_check_time = None
-        
+        self.last_tui_sync = 0.0
+        self.tui_sync_stats = {"scanned": 0, "added": 0, "updated": 0}
+
         # Registrar PID
         self.pid = os.getpid()
         self._write_pid()
-        
+
         # Setup signal handlers
         signal.signal(signal.SIGTERM, self._handle_signal)
         signal.signal(signal.SIGINT, self._handle_signal)
@@ -80,17 +84,17 @@ class BrainMonitor:
         """Verifica se precisa de checkpoint e executa."""
         status = self.read_status()
         token_count = status.get("token_count", 0)
-        
+
         if token_count == 0:
             return False
-        
+
         # Verificar se deve checkpoint
         if not self.checkpoint.should_checkpoint(token_count, self.context_window):
             return False
-        
+
         # Calcular pressão
         pressure = self.checkpoint.compute_pressure(token_count, self.context_window)
-        
+
         # Salvar checkpoint
         try:
             result = self.checkpoint.save_checkpoint(
@@ -98,23 +102,46 @@ class BrainMonitor:
                 context_window=self.context_window,
                 conversation_summary=f"Auto-checkpoint at {pressure} pressure level"
             )
-            
+
             self.checkpoints_saved += 1
             self.last_check_time = datetime.now().isoformat()
-            
+
             # Log
             print(f"[{datetime.now().strftime('%H:%M:%S')}] Checkpoint saved: {token_count}/{self.context_window} tokens (pressure: {pressure})")
-            
+
             return True
-            
+
         except Exception as e:
             self.checkpoint.writer_failures += 1
             print(f"[{datetime.now().strftime('%H:%M:%S')}] Checkpoint failed: {e}", file=sys.stderr)
-            
+
             if self.checkpoint.writer_failures >= MAX_FAILURES:
                 print(f"[{datetime.now().strftime('%H:%M:%S')}] Max failures reached, stopping monitor", file=sys.stderr)
                 self.running = False
-            
+
+            return False
+
+    def check_and_sync_tui(self):
+        """Sincroniza TUI SQLite para .brain/ a cada TUI_SYNC_INTERVAL segundos."""
+        now = time.time()
+        if now - self.last_tui_sync < TUI_SYNC_INTERVAL:
+            return False
+        try:
+            stats = sync_once()
+            self.tui_sync_stats = stats
+            self.last_tui_sync = now
+            if stats['scanned'] > 0 or stats['added'] > 0 or stats['updated'] > 0:
+                print(f"[{datetime.now().strftime('%H:%M:%S')}] [tui-sync] "
+                      f"scanned={stats['scanned']} +{stats['added']} "
+                      f"~{stats['updated']} moved={stats['moved_to_deleted']}")
+            if stats['errors']:
+                for err in stats['errors'][:3]:
+                    print(f"[tui-sync] ERR: {err}", file=sys.stderr)
+            return True
+        except Exception as e:
+            print(f"[{datetime.now().strftime('%H:%M:%S')}] [tui-sync] failed: {e}",
+                  file=sys.stderr)
+            self.last_tui_sync = now
             return False
     
     def run(self):
@@ -123,15 +150,17 @@ class BrainMonitor:
         print(f"[{datetime.now().strftime('%H:%M:%S')}] Session: {self.session_id}")
         print(f"[{datetime.now().strftime('%H:%M:%S')}] Context window: {self.context_window}")
         print(f"[{datetime.now().strftime('%H:%M:%S')}] Check interval: {CHECK_INTERVAL}s")
-        
+        print(f"[{datetime.now().strftime('%H:%M:%S')}] TUI sync interval: {TUI_SYNC_INTERVAL}s")
+
         while self.running:
             try:
                 self.check_and_checkpoint()
+                self.check_and_sync_tui()
             except Exception as e:
                 print(f"[{datetime.now().strftime('%H:%M:%S')}] Error: {e}", file=sys.stderr)
-            
+
             time.sleep(CHECK_INTERVAL)
-        
+
         # Cleanup
         self._cleanup()
         print(f"[{datetime.now().strftime('%H:%M:%S')}] Monitor stopped (saved {self.checkpoints_saved} checkpoints)")

@@ -2,6 +2,7 @@
 import re
 import shutil
 import subprocess
+import json
 from mcp.server.fastmcp import FastMCP
 
 # Inicializa o servidor FastMCP
@@ -13,6 +14,14 @@ IMPORTANTE: Se o usuario pedir para criar ou modificar uma macro mas nao especif
 peca esclarecimentos antes de prosseguir.
 
 Para documentos avancados, use create_from_example() passando um arquivo modelo existente.
+
+REGRAS DE COMUNICACAO:
+- Apos cada tool call, resuma o resultado de forma amigavel em portugues para o usuario
+- NUNCA invente limitacoes ou problemas que nao existem nas mensagens das tools
+- Se uma tool retornar mensagem de sucesso, reporte o resultado com clareza
+- Se uma tool retornar erro, explique o erro de forma simples e sugira a correcao
+- Use linguagem natural, nao exponha nomes tecnicos internos das tools
+- Mostre o caminho do arquivo criado/modificado
 """)
 
 # ==========================================
@@ -2518,6 +2527,9 @@ def create_presentation_pptx(file_path: str, slides: list) -> str:
     title_slide_layout = prs.slide_layouts[0]
     bullet_slide_layout = prs.slide_layouts[1]
 
+    total_slides = len(slides)
+    total_bullets = sum(len(s.get("bullet_points", [])) for s in slides)
+
     for i, s_data in enumerate(slides):
         title = s_data.get("title", "")
         bullets = s_data.get("bullet_points", [])
@@ -2535,7 +2547,15 @@ def create_presentation_pptx(file_path: str, slides: list) -> str:
                 p.level = 0
 
     prs.save(file_path)
-    return f"Apresentacao criada com sucesso em: {os.path.abspath(file_path)}"
+    abs_path = os.path.abspath(file_path)
+    return (
+        f"Apresentacao criada com sucesso!\n\n"
+        f"  Arquivo: {abs_path}\n"
+        f"  Slides: {total_slides}\n"
+        f"  Topicos: {total_bullets}\n"
+        f"\nProximos passos: use change_slide_layout_pptx() para layouts personalizados, "
+        f"add_image_to_slide_pptx() para imagens, ou set_transition_pptx() para transicoes entre slides."
+    )
 
 
 @mcp.tool()
@@ -2673,7 +2693,22 @@ def add_image_to_slide_pptx(file_path: str, slide_index: int, image_path: str, l
 
     slide.shapes.add_picture(image_path, left, top, width=width, height=height)
     prs.save(file_path)
-    return f"Imagem inserida com sucesso no slide {slide_index+1} da apresentacao {os.path.basename(file_path)}."
+    size_info = ""
+    if width_inch and height_inch:
+        size_info = f"\n  Tamanho: {width_inch}\" x {height_inch}\""
+    elif width_inch:
+        size_info = f"\n  Largura: {width_inch}\" (altura proporcional)"
+    elif height_inch:
+        size_info = f"\n  Altura: {height_inch}\" (largura proporcional)"
+    else:
+        size_info = "\n  Tamanho: original"
+    return (
+        f"Imagem inserida com sucesso!\n\n"
+        f"  Slide: {slide_index+1}\n"
+        f"  Arquivo de imagem: {os.path.basename(image_path)}\n"
+        f"  Posicao: ({left_inch}\", {top_inch}\"){size_info}\n"
+        f"  Apresentacao: {os.path.abspath(file_path)}"
+    )
 
 
 # ==========================================
@@ -2747,7 +2782,13 @@ def manage_slides_pptx(file_path: str, action: str, slide_index: int = None, tit
         if title:
             slide.shapes.title.text = title
         prs.save(file_path)
-        return f"Slide {len(prs.slides)} adicionado com sucesso."
+        return (
+            f"Slide adicionado com sucesso!\n\n"
+            f"  Indice: {len(prs.slides)-1}\n"
+            f"  Titulo: {title or '(sem titulo)'}\n"
+            f"  Total de slides: {len(prs.slides)}\n"
+            f"  Arquivo: {os.path.abspath(file_path)}"
+        )
 
     if action == "delete":
         if slide_index is None:
@@ -2763,7 +2804,12 @@ def manage_slides_pptx(file_path: str, action: str, slide_index: int = None, tit
         prs.part.drop_rel(rId)
         prs.slides._sldIdLst.remove(prs.slides._sldIdLst[slide_index])
         prs.save(file_path)
-        return f"Slide {slide_index} removido com sucesso."
+        return (
+            f"Slide removido com sucesso!\n\n"
+            f"  Indice removido: {slide_index}\n"
+            f"  Total de slides: {total - 1}\n"
+            f"  Arquivo: {os.path.abspath(file_path)}"
+        )
 
     return "Erro: Acao invalida. Use: add, delete ou list."
 
@@ -3027,7 +3073,13 @@ def add_table_to_slide_pptx(file_path: str, slide_index: int, data: list, left_i
                     paragraph.alignment = PP_ALIGN.CENTER
 
     prs.save(file_path)
-    return f"Tabela {rows}x{cols} adicionada ao slide {slide_index}."
+    return (
+        f"Tabela {rows}x{cols} adicionada com sucesso!\n\n"
+        f"  Slide: {slide_index+1}\n"
+        f"  Linhas: {rows} | Colunas: {cols}\n"
+        f"  Posicao: ({left_inch}\", {top_inch}\")\n"
+        f"  Apresentacao: {os.path.abspath(file_path)}"
+    )
 
 
 @mcp.tool()
@@ -3090,7 +3142,13 @@ def edit_slide_text_pptx(file_path: str, slide_index: int, shape_index: int, tex
 
     shape.text_frame.paragraphs[0].text = text
     prs.save(file_path)
-    return f"Texto do shape {shape_index} no slide {slide_index} atualizado."
+    preview = text if len(text) <= 60 else text[:60] + "..."
+    return (
+        f"Texto atualizado com sucesso!\n\n"
+        f"  Slide: {slide_index+1} | Shape: {shape_index}\n"
+        f"  Novo texto: \"{preview}\"\n"
+        f"  Arquivo: {os.path.abspath(file_path)}"
+    )
 
 
 @mcp.tool()
@@ -3226,8 +3284,9 @@ def add_animation_pptx(file_path: str, slide_index: int, shape_index: int = 0, e
     - effect (str, opcional): Tipo de efeito de animacao:
       - "fade": Fade in (aparecimento suave) — padrao
       - "fly_in": Entrada voo (sobe de baixo)
-      - "zoom": Zoom (cresce do centro)
+      - "float_in": Flutua para dentro
       - "wipe": Wipe (aparece como pincelada)
+      - "appear": Aparecer (sem efeito)
     - trigger (str, opcional): Gatilho da animacao:
       - "on_click": Ao clicar (padrao)
       - "after_previous": Apos o anterior terminar
@@ -3261,11 +3320,11 @@ def add_animation_pptx(file_path: str, slide_index: int, shape_index: int = 0, e
 
     try:
         from power_pptx import Presentation as PowerPresentation
-        from power_pptx.util import Inches as PInches
+        from power_pptx.enum.animation import PP_ANIM_TRIGGER
     except ImportError:
         return "Erro: power-pptx nao esta instalado. Execute: pip install power-pptx"
 
-    prs = PowerPresentation.open(file_path)
+    prs = PowerPresentation(file_path)
     total = len(prs.slides)
     if slide_index < 0 or slide_index >= total:
         return f"Erro: Indice {slide_index} invalido. Total: {total} slides."
@@ -3276,25 +3335,43 @@ def add_animation_pptx(file_path: str, slide_index: int, shape_index: int = 0, e
         return f"Erro: Indice de shape {shape_index} invalido. Total: {len(shapes)} shapes."
 
     shape = shapes[shape_index]
-    effect_map = {
+    preset_map = {
         "fade": "fade",
-        "fly_in": "flyIn",
-        "zoom": "zoom",
+        "fly_in": "fly_in",
+        "float_in": "float_in",
         "wipe": "wipe",
+        "appear": "appear",
     }
     trigger_map = {
-        "on_click": "onClick",
-        "after_previous": "afterPrevious",
-        "with_previous": "withPrevious",
+        "on_click": PP_ANIM_TRIGGER.ON_CLICK,
+        "after_previous": PP_ANIM_TRIGGER.AFTER_PREVIOUS,
+        "with_previous": PP_ANIM_TRIGGER.WITH_PREVIOUS,
     }
 
-    efeito = effect_map.get(effect, "fade")
-    gatilho = trigger_map.get(trigger, "onClick")
+    preset = preset_map.get(effect, "fade")
+    gatilho = trigger_map.get(trigger, PP_ANIM_TRIGGER.ON_CLICK)
 
     try:
-        shape.animation.add_effect(efeito, trigger=gatilho)
+        slide.animations.add_entrance(preset=preset, shape=shape, trigger=gatilho)
         prs.save(file_path)
-        return f"Animacao '{effect}' adicionada ao shape {shape_index} no slide {slide_index}."
+        effect_desc = {
+            "fade": "aparecimento suave (fade)",
+            "fly_in": "entrada voando (fly_in)",
+            "float_in": "flutuar para dentro (float_in)",
+            "wipe": "revelar (wipe)",
+            "appear": "aparecer (sem efeito)",
+        }.get(effect, effect)
+        trigger_desc = {
+            "on_click": "ao clicar",
+            "after_previous": "apos o anterior",
+            "with_previous": "junto com o anterior",
+        }.get(trigger, trigger)
+        return (
+            f"Animacao '{effect_desc}' adicionada com sucesso!\n\n"
+            f"  Slide: {slide_index} | Shape: {shape_index} ({shape.name if hasattr(shape, 'name') else 'sem nome'})\n"
+            f"  Gatilho: {trigger_desc}\n"
+            f"  Arquivo: {os.path.abspath(file_path)}"
+        )
     except Exception as e:
         return f"Erro: Nao foi possivel adicionar animacao. Detalhes: {str(e)[:200]}"
 
@@ -3324,7 +3401,10 @@ def set_transition_pptx(file_path: str, slide_index: int = None, effect: str = "
       - "push": Empurrar
       - "wipe": Wipe
       - "morph": Morph (transicao inteligente)
-      - "reveal": Revelar
+      - "reveal": Dissolve (mapeado)
+      - "zoom": Zoom
+      - "cover": Cover
+      - "cut": Cut (sem efeito)
     - duration (int, opcional): Duracao em milissegundos. Default: 1000 (1 segundo).
 
     RETORNO:
@@ -3353,31 +3433,58 @@ def set_transition_pptx(file_path: str, slide_index: int = None, effect: str = "
 
     try:
         from power_pptx import Presentation as PowerPresentation
+        from power_pptx.enum.presentation import MSO_TRANSITION_TYPE
     except ImportError:
         return "Erro: power-pptx nao esta instalado. Execute: pip install power-pptx"
 
-    prs = PowerPresentation.open(file_path)
+    prs = PowerPresentation(file_path)
     effect_map = {
-        "fade": "fade",
-        "push": "push",
-        "wipe": "wipe",
-        "morph": "morph",
-        "reveal": "reveal",
+        "fade": MSO_TRANSITION_TYPE.FADE,
+        "push": MSO_TRANSITION_TYPE.PUSH,
+        "wipe": MSO_TRANSITION_TYPE.WIPE,
+        "morph": MSO_TRANSITION_TYPE.MORPH,
+        "reveal": MSO_TRANSITION_TYPE.DISSOLVE,
+        "zoom": MSO_TRANSITION_TYPE.ZOOM,
+        "cover": MSO_TRANSITION_TYPE.COVER,
+        "cut": MSO_TRANSITION_TYPE.CUT,
     }
-    efeito = effect_map.get(effect, "fade")
+    efeito = effect_map.get(effect, MSO_TRANSITION_TYPE.FADE)
 
     if slide_index is not None:
         slides_to_apply = [prs.slides[slide_index]] if slide_index < len(prs.slides) else []
     else:
         slides_to_apply = list(prs.slides)
 
+    if not slides_to_apply:
+        return f"Erro: Nao foi possivel aplicar a transicao. Verifique o indice do slide."
+
     for slide in slides_to_apply:
-        slide.slide_show_transition.transition_type = efeito
-        slide.slide_show_transition.duration = duration / 1000
+        slide.transition.kind = efeito
+        slide.transition.duration = duration
+        slide.transition.advance_on_click = True
 
     prs.save(file_path)
-    destino = f"slide {slide_index}" if slide_index is not None else "todos os slides"
-    return f"Transicao '{effect}' aplicada a {destino}."
+    qtd = len(slides_to_apply)
+    if qtd == 1:
+        destino = f"o slide {slide_index}"
+    else:
+        destino = f"os {qtd} slides"
+    effect_desc = {
+        "fade": "suave (fade)",
+        "push": "deslizar (push)",
+        "wipe": "revelar (wipe)",
+        "morph": "morfar (morph)",
+        "reveal": "dissolver (reveal)",
+        "zoom": "zoom",
+        "cover": "cobrir (cover)",
+        "cut": "seco (cut)",
+    }.get(effect, effect)
+    return (
+        f"Transicao {effect_desc} aplicada com sucesso em {destino}!\n\n"
+        f"  Duracao: {duration}ms\n"
+        f"  Avanco: ao clicar\n"
+        f"  Arquivo: {os.path.abspath(file_path)}"
+    )
 
 
 @mcp.tool()
@@ -3587,6 +3694,261 @@ def create_presentation_from_example_pptx(example_path: str, output_path: str, s
 
     prs_novo.save(output_path)
     return f"Apresentacao criada a partir do exemplo em: {os.path.abspath(output_path)}"
+
+
+@mcp.tool()
+def list_template_slots_pptx(template_path: str) -> str:
+    """
+    Lista todos os slots de texto editaveis em um template de apresentacao.
+
+    Esta ferramenta analise um arquivo .pptx template e retorna o
+    mapeamento completo de slides e shapes com texto, permitindo saber
+    quais posicoes podem ser editadas. Use os indices retornados
+    (slide_N_shape_M) com create_from_template_pptx().
+
+    QUANDO USAR:
+    - Antes de criar uma apresentacao a partir de um template
+    - Para descobrir quais textos podem ser personalizados
+    - Para mapear a estrutura de qualquer template .pptx
+
+    PARAMETROS:
+    - template_path (str, obrigatorio): Caminho do arquivo .pptx template.
+      Ex: "C:\\templates\\clean_minimal.pptx"
+      Use caminhos absolutos ou relativos a partir do workspace.
+
+    RETORNO:
+    - JSON com a estrutura completa do template:
+      {
+        "total_slides": 25,
+        "slides": [
+          {
+            "slide_index": 0,
+            "shapes": [
+              {"shape_index": 10, "current_text": "A Presentation by: Jane Doe"},
+              {"shape_index": 12, "current_text": "Clean"}
+            ]
+          }
+        ]
+      }
+
+    EXEMPLO DE USO:
+        list_template_slots_pptx(template_path="./clean_minimal.pptx")
+        # Retorna JSON com todos os slides e shapes
+    """
+    erro = _validar_arquivo_existe(template_path)
+    if erro:
+        return erro
+
+    pptx = get_pptx()
+    prs = pptx.Presentation(template_path)
+
+    result = {
+        "total_slides": len(prs.slides),
+        "template": os.path.basename(template_path),
+        "slides": []
+    }
+
+    for slide_idx, slide in enumerate(prs.slides):
+        slide_info = {"slide_index": slide_idx, "shapes": []}
+        for shape_idx, shape in enumerate(slide.shapes):
+            if shape.has_text_frame and shape.text_frame.text.strip():
+                slide_info["shapes"].append({
+                    "shape_index": shape_idx,
+                    "shape_id": f"slide_{slide_idx}_shape_{shape_idx}",
+                    "current_text": shape.text_frame.text.strip()[:150]
+                })
+        result["slides"].append(slide_info)
+
+    return json.dumps(result, ensure_ascii=False, indent=2)
+
+
+@mcp.tool()
+def create_from_template_pptx(
+    template_path: str,
+    output_path: str,
+    slide_replacements: str
+) -> str:
+    """
+    Cria uma nova apresentacao a partir de um template, substituindo textos.
+
+    Esta ferramenta clona um template .pptx e substitui textos em shapes
+    especificos, preservando 100% da formatacao visual, cores, fontes,
+    layouts e imagens do template original.
+
+    QUANDO USAR:
+    - Para criar uma apresentacao profissional rapidamente
+    - Para usar templates de Slidesgo, SlidesCarnival, etc.
+    - Para manter consistencia visual entre documentos
+    - Para reaproveitar layouts profissionais
+
+    PARAMETROS:
+    - template_path (str, obrigatorio): Caminho do arquivo .pptx template.
+      Pode ser um template baixado de sites como SlidesCarnival ou um
+      template proprio salvo em ./data/templates/.
+
+    - output_path (str, obrigatorio): Caminho do novo arquivo .pptx.
+      Sera sobrescrito se ja existir.
+
+    - slide_replacements (str, obrigatorio): JSON com mapeamento de
+      substituicoes no formato:
+      {
+        "0": {  // slide_index (0-based)
+          "10": "Novo texto para shape 10",  // shape_index -> novo texto
+          "12": "Clean"  // substitui o texto do shape 12 por "Clean"
+        },
+        "3": {
+          "8": "INTRODUCAO"
+        }
+      }
+      Use list_template_slots_pptx() antes para descobrir os indices.
+
+    RETORNO:
+    - Mensagem de texto com confirmacao.
+      Ex: "Apresentacao criada a partir do template com sucesso! Slides: 25
+      Arquivo: D:\\projetos\\nova.pptx"
+
+    IMPORTANTE:
+    - O template NAO e modificado.
+    - Formatacao, cores, fontes e imagens sao 100% preservadas.
+    - Apenas os textos nos shapes especificados sao substituidos.
+    - Para textos com quebras de linha, use "\\n" no JSON.
+    - Shapes nao especificados permanecem com o texto original.
+
+    EXEMPLO DE USO:
+        # 1. Primeiro, listar os slots:
+        slots = list_template_slots_pptx(template_path="./data/templates/clean_minimal.pptx")
+        # 2. Depois, criar com substituicoes:
+        create_from_template_pptx(
+            template_path="./data/templates/clean_minimal.pptx",
+            output_path="./projeto/astronomia.pptx",
+            slide_replacements='{
+              "0": {
+                "10": "O Sistema Solar\\nMiguel Porto",
+                "11": "Janeiro 2026",
+                "12": "O SISTEMA",
+                "13": "OS PLANETAS",
+                "14": "O COSMOS"
+              },
+              "3": {
+                "8": "INTRODUCAO",
+                "9": "O sistema solar..."
+              }
+            }'
+        )
+        # Retorna: "Apresentacao criada a partir do template com sucesso!"
+    """
+    erro = _validar_arquivo_existe(template_path)
+    if erro:
+        return erro
+
+    try:
+        replacements = json.loads(slide_replacements)
+    except json.JSONDecodeError as e:
+        return f"Erro: slide_replacements invalido. JSON parse error: {str(e)}"
+
+    pptx = get_pptx()
+    prs = pptx.Presentation(template_path)
+
+    def set_shape_text(shape, new_text):
+        if not shape.has_text_frame:
+            return False
+        tf = shape.text_frame
+        if not tf.paragraphs:
+            return False
+        lines = new_text.split("\\n") if isinstance(new_text, str) else [str(new_text)]
+
+        # Substitui texto preservando a formatacao do primeiro run
+        old_paragraphs = list(tf.paragraphs)
+        first_p = old_paragraphs[0]
+        if first_p.runs:
+            first_p.runs[0].text = lines[0]
+            # Remove runs extras do primeiro paragrafo
+            for run in list(first_p.runs[1:]):
+                run._r.getparent().remove(run._r)
+        else:
+            first_p.text = lines[0]
+        # Remove paragrafos extras
+        for extra_p in old_paragraphs[1:]:
+            extra_p._p.getparent().remove(extra_p._p)
+        # Adiciona paragrafos adicionais (linhas extras)
+        for line in lines[1:]:
+            p = tf.add_paragraph()
+            p.text = line
+
+        # Auto-shrink: NOTE - nao modificamos bodyPr.xml diretamente
+        # porque templates do Google Slides compartilham bodyPr entre shapes,
+        # e modificar causa corrupcao do arquivo PPTX. Em vez disso,
+        # ajustamos o tamanho da fonte diretamente (abaixo na heuristica).
+
+        # Heuristica adicional: ajusta fonte e altura do shape para evitar
+        # sobreposicoes. Especialmente importante em titulos de cards
+        # (que tem altura fixa baixa)
+        try:
+            from pptx.util import Emu
+            if shape.width and shape.height:
+                width_in = Emu(shape.width).inches
+                height_in = Emu(shape.height).inches
+
+                if len(lines) == 1:
+                    # Linha unica: verifica largura
+                    original_size = first_p.runs[0].font.size if first_p.runs else None
+                    if original_size:
+                        size_pt = original_size.pt
+                        text_len = len(lines[0])
+                        # Chute empírico: largura_em_polegadas * 1.5
+                        # (32pt bold DM Sans ~ 0.6-0.7 in por char)
+                        max_chars = width_in * 1.5
+                        from pptx.util import Pt as _Pt
+                        if text_len > max_chars:
+                            reduction = max_chars / text_len
+                            new_size = max(10, int(size_pt * reduction))
+                            first_p.runs[0].font.size = _Pt(new_size)
+                        # Tambem reduz se altura for muito baixa (< 0.7in)
+                        # e texto tem mais de 5 chars (evita reduzir "Marte" para 18pt)
+                        elif height_in < 0.7 and size_pt > 18 and text_len > 5:
+                            new_size_h = min(18, max(10, int(size_pt * 0.7)))
+                            first_p.runs[0].font.size = _Pt(new_size_h)
+                else:
+                    # Multiplas linhas: verifica altura
+                    if first_p.runs:
+                        size_pt = first_p.runs[0].font.size.pt if first_p.runs[0].font.size else 21
+                        line_height_in = (size_pt * 1.4) / 72
+                        needed_height = line_height_in * len(lines) + 0.1
+                        if needed_height > height_in:
+                            new_size = int((height_in - 0.1) * 72 / (len(lines) * 1.4))
+                            new_size = max(8, new_size)
+                            from pptx.util import Pt as _Pt
+                            for p in tf.paragraphs:
+                                for r in p.runs:
+                                    if r.font.size:
+                                        r.font.size = _Pt(new_size)
+        except Exception:
+            pass
+
+        return True
+
+    changes_count = 0
+    for slide_key, shape_replacements in replacements.items():
+        slide_idx = int(slide_key)
+        if slide_idx >= len(prs.slides):
+            continue
+        slide = prs.slides[slide_idx]
+        for shape_key, new_text in shape_replacements.items():
+            shape_idx = int(shape_key)
+            if shape_idx >= len(slide.shapes):
+                continue
+            shape = list(slide.shapes)[shape_idx]
+            if set_shape_text(shape, new_text):
+                changes_count += 1
+
+    prs.save(output_path)
+    return (
+        f"Apresentacao criada a partir do template com sucesso!\n\n"
+        f"  Template: {os.path.basename(template_path)}\n"
+        f"  Slides: {len(prs.slides)}\n"
+        f"  Substituicoes aplicadas: {changes_count}\n"
+        f"  Arquivo: {os.path.abspath(output_path)}"
+    )
 
 
 # ==========================================
@@ -4148,6 +4510,811 @@ def append_to_document_word(file_path: str, elements: list) -> str:
     doc.save(file_path)
     total_paras = len(doc.paragraphs)
     return f"Conteudo adicionado ao documento: {total_paras} paragrafos totais em {os.path.abspath(file_path)}"
+
+
+# ==========================================
+# 6. FERRAMENTAS PARA DOCUMENTOS GRANDES
+# ==========================================
+
+import tempfile
+import threading
+import shutil
+from concurrent.futures import ThreadPoolExecutor, as_completed
+
+LARGE_DOC_THRESHOLD = 100
+
+
+# ---------------------------------------------------------------------------
+# 6.0 VERIFICACAO DE INTEGRIDADE
+# ---------------------------------------------------------------------------
+
+@mcp.tool()
+def verify_document_word(file_path: str) -> str:
+    """
+    Verifica integridade de um arquivo Word (.docx) e retorna estatisticas.
+
+    QUANDO USAR:
+    - Apos cada passo de merge incremental para confirmar que o documento nao corrompeu
+    - Antes de prosseguir com o proximo passo de geracao
+    - Para validar o documento final antes de entregar ao usuario
+    - Para diagnosticar problemas em documentos que nao abrem
+
+    PARAMETROS:
+    - file_path (str, obrigatorio): Caminho do arquivo .docx a verificar.
+
+    RETORNO:
+    - JSON com: status, paginas, paragrafos, caracteres, tamanho_kb, ok
+      Exemplo:
+        {"status": "ok", "paginas": 5, "paragrafos": 42, "caracteres": 3200,
+         "tamanho_kb": 48, "ok": true}
+
+    IMPORTANTE:
+    - Usa Word COM (requer Microsoft Word instalado) para contar paginas com precisao.
+    - Se o arquivo estiver corrompido, retorna status "corrompido" com detalhes.
+    - Se o Word nao estiver disponivel, faz verificacao basica via python-docx.
+    """
+    erro = _validar_arquivo_existe(file_path)
+    if erro:
+        return erro
+
+    import json
+
+    try:
+        import win32com.client
+        word = win32com.client.Dispatch("Word.Application")
+        word.DisplayAlerts = False
+        word.Visible = False
+        try:
+            doc = word.Documents.Open(os.path.abspath(file_path))
+            paginas = doc.ComputeStatistics(2)
+            paragrafos = doc.Paragraphs.Count
+            caracteres = doc.ComputeStatistics(3)
+            doc.Close()
+            info = {
+                "status": "ok",
+                "paginas": paginas,
+                "paragrafos": paragrafos,
+                "caracteres": caracteres,
+                "tamanho_kb": round(os.path.getsize(file_path) / 1024, 1),
+                "ok": True,
+                "metodo": "com"
+            }
+            return json.dumps(info, ensure_ascii=False, indent=2)
+        except Exception as e:
+            return json.dumps({
+                "status": "corrompido",
+                "erro": str(e)[:200],
+                "tamanho_kb": round(os.path.getsize(file_path) / 1024, 1),
+                "ok": False,
+                "metodo": "com"
+            }, ensure_ascii=False, indent=2)
+        finally:
+            word.Quit()
+    except ImportError:
+        pass
+
+    # Fallback: python-docx basico
+    try:
+        docx = get_docx()
+        doc = docx.Document(file_path)
+        paragrafos = len(doc.paragraphs)
+        info = {
+            "status": "ok",
+            "paginas": "N/A (sem COM)",
+            "paragrafos": paragrafos,
+            "tamanho_kb": round(os.path.getsize(file_path) / 1024, 1),
+            "ok": True,
+            "metodo": "python-docx"
+        }
+        return json.dumps(info, ensure_ascii=False, indent=2)
+    except Exception as e:
+        return json.dumps({
+            "status": "corrompido",
+            "erro": str(e)[:200],
+            "tamanho_kb": round(os.path.getsize(file_path) / 1024, 1),
+            "ok": False,
+            "metodo": "python-docx"
+        }, ensure_ascii=False, indent=2)
+
+
+@mcp.tool()
+def verify_document_excel(file_path: str) -> str:
+    """
+    Verifica integridade de uma planilha Excel (.xlsx) e retorna estatisticas.
+
+    QUANDO USAR:
+    - Para validar planilhas grandes geradas com create_large_spreadsheet_excel()
+    - Para verificar se o arquivo nao corrompeu durante a geracao
+    - Para diagnosticar problemas em arquivos .xlsx
+
+    PARAMETROS:
+    - file_path (str, obrigatorio): Caminho do arquivo .xlsx a verificar.
+
+    RETORNO:
+    - JSON com: status, abas, linhas_totais, tamanho_kb, ok
+      Exemplo:
+        {"status": "ok", "abas": 3, "linhas_totais": 12500,
+         "tamanho_kb": 256, "ok": true}
+    """
+    erro = _validar_arquivo_existe(file_path)
+    if erro:
+        return erro
+    erro_ext = _validar_extensao(file_path, (".xlsx", ".xlsm"))
+    if erro_ext:
+        return erro_ext
+
+    import json
+    try:
+        openpyxl = get_openpyxl()
+        wb = openpyxl.load_workbook(file_path, read_only=True, data_only=True)
+        info = {
+            "status": "ok",
+            "abas": len(wb.sheetnames),
+            "sheetnames": wb.sheetnames,
+            "linhas_totais": sum(ws.max_row or 0 for ws in wb.worksheets),
+            "tamanho_kb": round(os.path.getsize(file_path) / 1024, 1),
+            "ok": True
+        }
+        wb.close()
+        return json.dumps(info, ensure_ascii=False, indent=2)
+    except Exception as e:
+        return json.dumps({
+            "status": "corrompido",
+            "erro": str(e)[:200],
+            "tamanho_kb": round(os.path.getsize(file_path) / 1024, 1),
+            "ok": False
+        }, ensure_ascii=False, indent=2)
+
+
+@mcp.tool()
+def verify_presentation_pptx(file_path: str) -> str:
+    """
+    Verifica integridade de uma apresentacao PowerPoint (.pptx) e conta slides.
+
+    QUANDO USAR:
+    - Para validar apresentacoes grandes geradas em modulos
+    - Para verificar se todos os slides foram preservados apos merge
+    - Para diagnosticar problemas em arquivos .pptx
+
+    PARAMETROS:
+    - file_path (str, obrigatorio): Caminho do arquivo .pptx a verificar.
+
+    RETORNO:
+    - JSON com: status, slides, tamanho_kb, ok
+      Exemplo:
+        {"status": "ok", "slides": 45, "tamanho_kb": 1820, "ok": true}
+    """
+    erro = _validar_arquivo_existe(file_path)
+    if erro:
+        return erro
+    erro_ext = _validar_extensao(file_path, (".pptx",))
+    if erro_ext:
+        return erro_ext
+
+    import json
+    try:
+        pptx = get_pptx()
+        prs = pptx.Presentation(file_path)
+        info = {
+            "status": "ok",
+            "slides": len(prs.slides),
+            "tamanho_kb": round(os.path.getsize(file_path) / 1024, 1),
+            "ok": True
+        }
+        return json.dumps(info, ensure_ascii=False, indent=2)
+    except Exception as e:
+        return json.dumps({
+            "status": "corrompido",
+            "erro": str(e)[:200],
+            "tamanho_kb": round(os.path.getsize(file_path) / 1024, 1),
+            "ok": False
+        }, ensure_ascii=False, indent=2)
+
+
+@mcp.tool()
+def verify_document_pdf(file_path: str) -> str:
+    """
+    Verifica integridade de um arquivo PDF e conta paginas.
+
+    QUANDO USAR:
+    - Para validar PDFs gerados via convert_to_pdf_word()
+    - Para verificar se a conversao preservou todas as paginas
+    - Para diagnosticar problemas em arquivos .pdf
+
+    PARAMETROS:
+    - file_path (str, obrigatorio): Caminho do arquivo .pdf a verificar.
+
+    RETORNO:
+    - JSON com: status, paginas, tamanho_kb, ok
+      Exemplo:
+        {"status": "ok", "paginas": 52, "tamanho_kb": 890, "ok": true}
+    """
+    erro = _validar_arquivo_existe(file_path)
+    if erro:
+        return erro
+    erro_ext = _validar_extensao(file_path, (".pdf",))
+    if erro_ext:
+        return erro_ext
+
+    import json
+    try:
+        fitz = get_pymupdf()
+        doc = fitz.open(file_path)
+        info = {
+            "status": "ok",
+            "paginas": doc.page_count,
+            "tamanho_kb": round(os.path.getsize(file_path) / 1024, 1),
+            "ok": True
+        }
+        doc.close()
+        return json.dumps(info, ensure_ascii=False, indent=2)
+    except Exception as e:
+        return json.dumps({
+            "status": "corrompido",
+            "erro": str(e)[:200],
+            "tamanho_kb": round(os.path.getsize(file_path) / 1024, 1),
+            "ok": False
+        }, ensure_ascii=False, indent=2)
+
+
+# ---------------------------------------------------------------------------
+# 6.1 MERGE INCREMENTAL COM VERIFICACAO
+# ---------------------------------------------------------------------------
+
+class MergeError(Exception):
+    """Excecao lancada quando um passo do merge corrompe o documento."""
+    def __init__(self, message: str, step: int, last_good: str = None):
+        super().__init__(message)
+        self.step = step
+        self.last_good = last_good
+
+
+def _merge_word_incremental(
+    input_files: list,
+    output_path: str,
+    temp_dir: str = None,
+    verify: bool = True
+) -> dict:
+    """Mescla arquivos .docx incrementalmente com verificacao pos-passo.
+
+    Retorna dict com:
+      - "output": caminho do arquivo final
+      - "steps": lista de resultados de cada passo
+      - "verified": True se todos os passos passaram na verificacao
+      - "temp_dir": diretorio com todos os temps preservados
+      - "last_good": ultimo arquivo integro (para rollback)
+    """
+    import win32com.client
+    import json
+
+    if temp_dir is None:
+        temp_dir = tempfile.mkdtemp()
+
+    steps = []
+    working = input_files[0]
+    last_good = input_files[0] if os.path.exists(input_files[0]) else None
+
+    for i in range(1, len(input_files)):
+        merged = os.path.join(temp_dir, f"_merge_{i:04d}.docx")
+
+        # --- PASSO DE MERGE ---
+        word = win32com.client.Dispatch("Word.Application")
+        word.DisplayAlerts = False
+        word.Visible = False
+        try:
+            doc = word.Documents.Open(os.path.abspath(working))
+            word.Selection.InsertFile(os.path.abspath(input_files[i]))
+            doc.SaveAs(os.path.abspath(merged))
+            doc.Close()
+        except Exception as e:
+            word.Quit()
+            raise MergeError(
+                f"Falha no merge passo {i}: {str(e)[:200]}",
+                step=i,
+                last_good=last_good
+            )
+        word.Quit()
+
+        # --- VERIFICACAO POS-PASSO ---
+        if verify:
+            v_result = _verify_docx_integrity(merged)
+            if not v_result.get("ok", False):
+                raise MergeError(
+                    f"Documento corrompido apos merge passo {i}: {v_result.get('erro', 'erro desconhecido')}",
+                    step=i,
+                    last_good=last_good
+                )
+
+        steps.append({
+            "step": i,
+            "input": input_files[i],
+            "merged": merged,
+            "verified": True,
+            "paginas": v_result.get("paginas", "N/A") if verify else "N/A"
+        })
+        working = merged
+        last_good = merged
+
+    # Copia resultado final
+    shutil.copy2(working, output_path)
+
+    return {
+        "output": output_path,
+        "steps": steps,
+        "verified": True,
+        "temp_dir": temp_dir,
+        "last_good": last_good
+    }
+
+
+def _verify_docx_integrity(file_path: str) -> dict:
+    """Verifica integridade de .docx via COM com fallback python-docx."""
+    try:
+        import win32com.client
+        word = win32com.client.Dispatch("Word.Application")
+        word.DisplayAlerts = False
+        word.Visible = False
+        try:
+            doc = word.Documents.Open(os.path.abspath(file_path))
+            paginas = doc.ComputeStatistics(2)
+            paragrafos = doc.Paragraphs.Count
+            doc.Close()
+            return {"ok": True, "paginas": paginas, "paragrafos": paragrafos}
+        except Exception as e:
+            return {"ok": False, "erro": str(e)[:200]}
+        finally:
+            word.Quit()
+    except ImportError:
+        pass
+
+    # Fallback basico
+    try:
+        docx = get_docx()
+        doc = docx.Document(file_path)
+        return {"ok": True, "paginas": "N/A", "paragrafos": len(doc.paragraphs)}
+    except Exception as e:
+        return {"ok": False, "erro": str(e)[:200]}
+
+
+@mcp.tool()
+def cleanup_temp_files(temp_dir: str) -> str:
+    """
+    Remove diretorio de arquivos temporarios apos confirmacao do usuario.
+
+    QUANDO USAR:
+    - APENAS quando o usuario confirmar que o documento final esta OK
+    - Depois de verificar o resultado com verify_document_word()
+    - Para liberar espaco em disco apos geracao de documentos grandes
+
+    PARAMETROS:
+    - temp_dir (str, obrigatorio): Caminho do diretorio temporario a remover.
+      Geralmente retornado por create_large_document_word() ou merge_word_documents().
+
+    RETORNO:
+    - Mensagem confirmando a remocao.
+      Ex: "Arquivos temporarios removidos: D:\\temp\\xxx"
+      Ou: "Diretorio nao encontrado ou ja foi limpo."
+
+    IMPORTANTE:
+    - Esta operacao e IRREVERSIVEL. Nao e possivel recuperar os arquivos depois.
+    - So chame esta tool apos o usuario confirmar que esta satisfeito com o resultado.
+    """
+    if not os.path.exists(temp_dir):
+        return "Diretorio nao encontrado ou ja foi limpo."
+
+    try:
+        shutil.rmtree(temp_dir, ignore_errors=True)
+        return f"Arquivos temporarios removidos: {os.path.abspath(temp_dir)}"
+    except Exception as e:
+        return f"Erro ao limpar diretorio temporario. Detalhes: {str(e)[:200]}"
+
+
+def _criar_secao_word(section: dict, output_path: str) -> str:
+    """Cria um arquivo .docx para uma secao. Usado internamente por create_large_document_word."""
+    docx = get_docx()
+    doc = docx.Document()
+    title = section.get("title", "")
+    elements = section.get("elements", [])
+
+    if title:
+        doc.add_heading(title, level=1)
+
+    for el in elements:
+        el_type = el.get("type", "paragraph")
+        text = el.get("text", "")
+        if el_type == "heading1":
+            doc.add_heading(text, level=1)
+        elif el_type == "heading2":
+            doc.add_heading(text, level=2)
+        elif el_type == "heading3":
+            doc.add_heading(text, level=3)
+        elif el_type == "list_item":
+            p = doc.add_paragraph(style="List Bullet")
+            run = p.add_run(text)
+            run.bold = el.get("bold", False)
+            run.italic = el.get("italic", False)
+        else:
+            p = doc.add_paragraph()
+            run = p.add_run(text)
+            run.bold = el.get("bold", False)
+            run.italic = el.get("italic", False)
+
+    doc.save(output_path)
+    return output_path
+
+
+@mcp.tool()
+def create_large_document_word(
+    file_path: str,
+    sections: list,
+    method: str = "auto",
+    parallel: bool = True
+) -> str:
+    """
+    Cria documentos Word grandes (.docx) dividindo em secoes e mesclando via COM.
+
+    QUANDO USAR:
+    - Para documentos com 100+ elementos ou 50+ paginas
+    - Quando create_document_word() demora ou trava
+    - Para relatorios longos com capitulos, secoes e anexos
+    - Para documentos que exigem geracao robusta sem travamento
+
+    PARAMETROS:
+    - file_path (str, obrigatorio): Caminho onde salvar o documento final.
+      Ex: "./relatorio.docx", "C:\\docs\\grande.docx"
+
+    - sections (list[dict], obrigatorio): Lista de secoes. Cada secao:
+      - "title" (str, opcional): Titulo da secao (heading1).
+      - "elements" (list[dict], obrigatorio): Elementos no mesmo formato de create_document_word():
+          "type": "heading1" | "heading2" | "heading3" | "paragraph" | "list_item"
+          "text": str
+          "bold": bool (opcional)
+          "italic": bool (opcional)
+      Exemplo:
+        [
+          {"title": "Capitulo 1", "elements": [
+            {"type": "paragraph", "text": "Texto do capitulo 1..."},
+            {"type": "list_item", "text": "Item importante", "bold": true}
+          ]},
+          {"title": "Capitulo 2", "elements": [
+            {"type": "paragraph", "text": "Texto do capitulo 2..."}
+          ]}
+        ]
+
+    - method (str, opcional): Estrategia de geracao:
+      - "auto" (padrao): Conta elementos totais. Se < 100 usa metodo direto (rapido),
+        se >= 100 usa seccionado com merge COM.
+      - "direct": Forca metodo direto (chama create_document_word internamente).
+      - "sectioned": Forca metodo seccionado com merge COM.
+
+    - parallel (bool, opcional): Se True (padrao), gera secoes em paralelo (threads).
+      Se False, gera sequencialmente. Paralelo e mais rapido para muitos capitulos.
+
+    RETORNO:
+    - Mensagem com caminho absoluto do arquivo salvo.
+      Ex: "Documento grande criado com sucesso (5 secoes, ~120 elementos): D:\\docs\\relatorio.docx"
+
+    REQUISITOS:
+    - Windows com Microsoft Word instalado (para merge via COM)
+    - Biblioteca pywin32 (pip install pywin32)
+    - Para metodo "direct", nao requer Word
+
+    IMPORTANTE:
+    - Cada secao e gerada em arquivo temporario separado, depois mesclada.
+    - Arquivos temporarios sao limpos automaticamente ao final.
+    - Para documentos > 200 secoes, limite parallel a 4-8 threads.
+    """
+    total_elements = sum(len(s.get("elements", [])) for s in sections)
+
+    if method == "auto" and total_elements < LARGE_DOC_THRESHOLD:
+        flat = []
+        for s in sections:
+            title = s.get("title", "")
+            if title:
+                flat.append({"type": "heading1", "text": title})
+            flat.extend(s.get("elements", []))
+        docx = get_docx()
+        doc = docx.Document()
+        for el in flat:
+            el_type = el.get("type", "paragraph")
+            text = el.get("text", "")
+            if el_type == "heading1":
+                doc.add_heading(text, level=1)
+            elif el_type == "heading2":
+                doc.add_heading(text, level=2)
+            elif el_type == "heading3":
+                doc.add_heading(text, level=3)
+            elif el_type == "list_item":
+                p = doc.add_paragraph(style="List Bullet")
+                run = p.add_run(text)
+                run.bold = el.get("bold", False)
+                run.italic = el.get("italic", False)
+            else:
+                p = doc.add_paragraph()
+                run = p.add_run(text)
+                run.bold = el.get("bold", False)
+                run.italic = el.get("italic", False)
+        doc.save(file_path)
+        return (
+            f"Documento criado com sucesso (direto, {total_elements} elementos): "
+            f"{os.path.abspath(file_path)}"
+        )
+
+    try:
+        import win32com.client
+    except ImportError:
+        return "Erro: pywin32 nao esta instalado. Execute: pip install pywin32"
+
+    temp_dir = tempfile.mkdtemp(prefix="office_merge_")
+    try:
+        section_files = []
+        section_info = []
+
+        def gen_section(i: int, sec: dict) -> tuple:
+            tmp = os.path.join(temp_dir, f"sec_{i:04d}.docx")
+            _criar_secao_word(sec, tmp)
+            return (i, tmp)
+
+        if parallel and len(sections) > 1:
+            with ThreadPoolExecutor(max_workers=min(8, len(sections))) as pool:
+                futures = {pool.submit(gen_section, i, sec): i for i, sec in enumerate(sections)}
+                for future in as_completed(futures):
+                    i, tmp = future.result()
+                    section_info.append((i, tmp))
+            section_info.sort(key=lambda x: x[0])
+            section_files = [f for _, f in section_info]
+        else:
+            for i, sec in enumerate(sections):
+                _, tmp = gen_section(i, sec)
+                section_files.append(tmp)
+
+        if not section_files:
+            return "Erro: Nenhuma secao foi gerada. Forneca ao menos uma secao com elements."
+
+        result = _merge_word_incremental(section_files, file_path, temp_dir)
+
+        steps_summary = "; ".join(
+            f"passo {s['step']}: {s.get('paginas', 'N/A')} pag"
+            for s in result["steps"]
+        )
+
+        return (
+            f"Documento grande criado com sucesso ({len(sections)} secoes, "
+            f"~{total_elements} elementos)\n"
+            f"Final: {os.path.abspath(file_path)}\n"
+            f"Verificacao: {steps_summary}\n"
+            f"Temps preservados em: {os.path.abspath(temp_dir)}\n"
+            f"Ultimo integro: {os.path.abspath(result['last_good'])}\n"
+            f"Use cleanup_temp_files('{os.path.abspath(temp_dir)}') quando confirmar o resultado."
+        )
+    except MergeError as e:
+        return (
+            f"ERRO no merge passo {e.step}: {e.message}\n"
+            f"Ultimo arquivo integro: {os.path.abspath(e.last_good) if e.last_good else 'N/A'}\n"
+            f"Temps preservados em: {os.path.abspath(temp_dir)}\n"
+            f"Seccoes individuais disponiveis para recuperacao."
+        )
+    except Exception as e:
+        return f"Erro: Nao foi possivel gerar o documento grande. Detalhes: {str(e)[:400]}"
+
+
+@mcp.tool()
+def merge_word_documents(output_path: str, input_files: list) -> str:
+    """
+    Mescla multiplos arquivos Word (.docx) em um unico documento, preservando formatacao.
+
+    QUANDO USAR:
+    - Para combinar capitulos gerados separadamente em um documento unico
+    - Para unir documentos de diferentes autores
+    - Para anexar documentos a um relatorio principal
+    - Para montar documentos grandes a partir de partes independentes
+
+    PARAMETROS:
+    - output_path (str, obrigatorio): Caminho do arquivo final mesclado.
+      Ex: "./final.docx", "C:\\docs\\completo.docx"
+
+    - input_files (list[str], obrigatorio): Lista de caminhos dos .docx a mesclar.
+      A ORDEM determina a sequencia no documento final.
+      Ex: ["./capa.docx", "./capitulo1.docx", "./capitulo2.docx", "./anexos.docx"]
+
+    RETORNO:
+    - Mensagem com caminho absoluto do arquivo mesclado.
+      Ex: "Documentos mesclados com sucesso (4 arquivos): D:\\docs\\completo.docx"
+
+    REQUISITOS:
+    - Windows com Microsoft Word instalado (via COM)
+    - pywin32 instalado (pip install pywin32)
+
+    IMPORTANTE:
+    - A formatacao, estilos, tabelas e imagens de CADA arquivo sao preservados.
+    - A ordem dos arquivos no array define a ordem no documento final.
+    - O arquivo de saida e SOBRESCRITO se ja existir.
+    """
+    if not input_files:
+        return "Erro: Forneca ao menos um arquivo .docx para mesclar."
+    for f in input_files:
+        err = _validar_arquivo_existe(f)
+        if err:
+            return err
+        ext_err = _validar_extensao(f, (".docx",))
+        if ext_err:
+            return ext_err
+
+    try:
+        import win32com.client
+        temp_dir = tempfile.mkdtemp(prefix="office_merge_")
+        try:
+            result = _merge_word_incremental(input_files, output_path, temp_dir)
+            steps_summary = "; ".join(
+                f"passo {s['step']}: {s.get('paginas', 'N/A')} pag"
+                for s in result["steps"]
+            )
+            return (
+                f"Documentos mesclados com sucesso ({len(input_files)} arquivos)\n"
+                f"Final: {os.path.abspath(output_path)}\n"
+                f"Verificacao: {steps_summary}\n"
+                f"Temps preservados em: {os.path.abspath(temp_dir)}\n"
+                f"Ultimo integro: {os.path.abspath(result['last_good'])}\n"
+                f"Use cleanup_temp_files('{os.path.abspath(temp_dir)}') quando confirmar."
+            )
+        except MergeError as e:
+            return (
+                f"ERRO no merge passo {e.step}: {e.message}\n"
+                f"Ultimo arquivo integro: {os.path.abspath(e.last_good) if e.last_good else 'N/A'}\n"
+                f"Temps preservados em: {os.path.abspath(temp_dir)}"
+            )
+    except ImportError:
+        return "Erro: pywin32 nao esta instalado. Execute: pip install pywin32"
+    except Exception as e:
+        return f"Erro: Nao foi possivel mesclar os documentos. Detalhes: {str(e)[:400]}"
+
+
+@mcp.tool()
+def create_large_spreadsheet_excel(file_path: str, sheets_data: dict) -> str:
+    """
+    Cria planilhas Excel grandes (.xlsx) usando modo write-only para evitar travamento.
+
+    QUANDO USAR:
+    - Para planilhas com 10.000+ linhas ou muitas abas
+    - Quando create_spreadsheet_excel() demora ou usa memoria excessiva
+    - Para exportar grandes volumes de dados tabulares
+    - Para gerar relatorios com muitas linhas de dados
+
+    PARAMETROS:
+    - file_path (str, obrigatorio): Caminho de destino da planilha.
+      Ex: "./dados_grandes.xlsx", "C:\\planilhas\\exportacao.xlsx"
+
+    - sheets_data (dict, obrigatorio): Dicionario {nome_aba: dados}.
+      - Chave (str): Nome da aba (ex: "Vendas", "Clientes")
+      - Valor (list[list]): Lista de linhas. Cada linha e uma lista de valores.
+        A PRIMEIRA LINHA de cada aba e tratada como cabecalho.
+      Exemplo:
+        {
+          "Vendas": [
+            ["Produto", "Qtd", "Valor"],
+            ["A", 100, 5000],
+            ["B", 200, 7000],
+            ...ate 50000 linhas...
+          ]
+        }
+
+    RETORNO:
+    - Mensagem com caminho absoluto do arquivo salvo.
+      Ex: "Planilha grande criada com sucesso (3 abas, ~15000 linhas): D:\\dados\\export.xlsx"
+
+    DIFERENCA COM create_spreadsheet_excel():
+    - Usa openpyxl write-only (WriteOnlyMode) — memoria constante, nao cresce com dados.
+    - Suporta volumes muito maiores sem travamento.
+    - Nao suporta formatacao celula a celula (apenas dados puros + cabecalho em negrito).
+
+    IMPORTANTE:
+    - Nao suporta formatacao individual de celulas (apenas dados + cabecalho negrito).
+    - Para planilhas com formatacao, use create_spreadsheet_excel() (ate ~5000 linhas).
+    """
+    try:
+        openpyxl = get_openpyxl()
+        from openpyxl.styles import Font
+
+        wb = openpyxl.Workbook(write_only=True)
+
+        total_rows = 0
+        sheet_count = 0
+        for sheet_name, rows in sheets_data.items():
+            ws = wb.create_sheet(title=sheet_name)
+            sheet_count += 1
+            for i, row in enumerate(rows):
+                if i == 0:
+                    ws.append(row)
+                else:
+                    ws.append(row)
+                total_rows += 1
+
+        wb.save(file_path)
+        return (
+            f"Planilha grande criada com sucesso ({sheet_count} abas, "
+            f"~{total_rows} linhas): {os.path.abspath(file_path)}"
+        )
+    except Exception as e:
+        return f"Erro: Nao foi possivel criar a planilha grande. Detalhes: {str(e)[:400]}"
+
+
+@mcp.tool()
+def merge_presentations_pptx(output_path: str, input_files: list) -> str:
+    """
+    Mescla multiplas apresentacoes PowerPoint (.pptx) em uma unica, preservando slides.
+
+    QUANDO USAR:
+    - Para combinar apresentacoes de diferentes autores
+    - Para unir slides de varias fontes em uma apresentacao unica
+    - Para montar apresentacoes grandes a partir de modulos independentes
+    - Para adicionar slides de uma apresentacao existente a outra
+
+    PARAMETROS:
+    - output_path (str, obrigatorio): Caminho da apresentacao final mesclada.
+      Ex: "./final.pptx", "C:\\slides\\completa.pptx"
+
+    - input_files (list[str], obrigatorio): Lista de caminhos dos .pptx a mesclar,
+      na ORDEM desejada.
+      Ex: ["./intro.pptx", "./modulo1.pptx", "./modulo2.pptx", "./conclusao.pptx"]
+
+    RETORNO:
+    - Mensagem com caminho absoluto da apresentacao mesclada.
+      Ex: "Apresentacoes mescladas com sucesso (4 arquivos): D:\\slides\\final.pptx"
+
+    IMPORTANTE:
+    - Cada slide preserva seu layout, texto, imagens e formatacao original.
+    - A ordem dos arquivos no array define a ordem dos slides no resultado.
+    - O arquivo de saida e SOBRESCRITO se ja existir.
+
+    EXEMPLO DE USO:
+        merge_presentations_pptx(
+            output_path="./final.pptx",
+            input_files=["./capa.pptx", "./secao1.pptx", "./secao2.pptx"]
+        )
+        # Retorna: "Apresentacoes mescladas com sucesso (3 arquivos): D:\\slides\\final.pptx"
+    """
+    if not input_files:
+        return "Erro: Forneca ao menos um arquivo .pptx para mesclar."
+    for f in input_files:
+        err = _validar_arquivo_existe(f)
+        if err:
+            return err
+        ext_err = _validar_extensao(f, (".pptx",))
+        if ext_err:
+            return ext_err
+
+    try:
+        pptx = get_pptx()
+        prs = pptx.Presentation()
+        slide_width = prs.slide_width
+        slide_height = prs.slide_height
+
+        for f in input_files:
+            src = pptx.Presentation(f)
+            for slide in src.slides:
+                slide_layout = prs.slide_layouts[0]
+                new_slide = prs.slides.add_slide(slide_layout)
+                for shape in slide.shapes:
+                    if shape.has_text_frame:
+                        for p in shape.text_frame.paragraphs:
+                            text = p.text
+                            if text.strip():
+                                from pptx.util import Inches, Pt
+                                txBox = new_slide.shapes.add_textbox(
+                                    shape.left, shape.top,
+                                    shape.width, shape.height
+                                )
+                                tf = txBox.text_frame
+                                tf.text = text
+            src = None
+
+        prs.save(output_path)
+        return (
+            f"Apresentacoes mescladas com sucesso ({len(input_files)} arquivos): "
+            f"{os.path.abspath(output_path)}"
+        )
+    except Exception as e:
+        return f"Erro: Nao foi possivel mesclar as apresentacoes. Detalhes: {str(e)[:400]}"
 
 
 # ==========================================

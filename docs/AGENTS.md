@@ -88,6 +88,27 @@ Memory tools are available and must be used every conversation.
 
 **Token budget:** Keep `session_memory.md` under 200 lines. Move old entries to `session_history.md`.
 
+## TUI Sync — Chat Registry Portátil
+
+O `.brain/chat_registry.json` é um **espelho portátil** de todos os chats do opencode TUI, sincronizado automaticamente.
+
+**Como funciona:**
+- `tui_sync.py` lê o SQLite do TUI em modo read-only (não bloqueia opencode.exe)
+- Detecta sessions por `time_updated` (incremental, não reprocessa tudo)
+- Cria `metadata.json` + `messages.jsonl` em `.brain/sessions/{tui_session_id}/`
+- Detecta deleções após 3 scans consecutivos (3 min) e move para `.brain/sessions/_deleted/`
+- Roda a cada 60s dentro do `brain_monitor.py`
+
+**Identificador unificado:** `tui_session_id` = `brain_uuid` (formato `ses_xxx`)
+
+**Cross-platform:** O path do TUI SQLite é resolvido automaticamente:
+1. `OPENCODE_TUI_DB_PATH` env var (override)
+2. Windows: `~/.local/share/opencode/opencode.db`
+3. Mac: `~/Library/Application Support/opencode/opencode.db`
+4. Linux: `~/.local/share/opencode/opencode.db`
+
+**Universal:** Funciona para **todos** os agents (build, plan, explore, custom) — não depende de o agent chamar `brain_init()`.
+
 ## Auto-Checkpoint System
 
 The brain monitor runs in background and automatically saves checkpoints at:

@@ -111,7 +111,7 @@ Se precisar usar outra chave, defina a variável de ambiente:
 $env:NVIDIA_API_KEY = 'nvapi-sua-chave'
 ```
 
-Ou crie um arquivo `.env` na raiz do projeto:
+Ou crie um arquivo `config/.env` (template já existe em `config/.env`):
 
 ```
 NVIDIA_API_KEY=nvapi-sua-chave

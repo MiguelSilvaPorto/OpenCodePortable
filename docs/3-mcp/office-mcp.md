@@ -8,7 +8,7 @@ Servidor MCP para manipulacao de documentos Office e PDF.
 scripts/office_mcp.py
 ```
 
-## Ferramentas Disponiveis (51)
+## Ferramentas Disponiveis (53)
 
 ### Word (.docx) — 17 tools
 
@@ -52,7 +52,7 @@ scripts/office_mcp.py
 | `analyze_spreadsheet_style_excel` | Extrair estilos do documento |
 | `create_spreadsheet_from_example_excel` | Criar replicando estilo |
 
-### PowerPoint (.pptx) — 14 tools
+### PowerPoint (.pptx) — 16 tools
 
 | Ferramenta | Descricao |
 |------------|-----------|
@@ -70,6 +70,8 @@ scripts/office_mcp.py
 | `add_smart_art_pptx` | Adicionar SmartArt (listas, processos, hierarquias) |
 | `analyze_presentation_style_pptx` | Extrair tema, cores e fontes |
 | `create_presentation_from_example_pptx` | Criar replicando estilo |
+| `list_template_slots_pptx` | Listar slots editaveis de um template |
+| `create_from_template_pptx` | Criar PPTX a partir de template com substituicoes |
 
 ### VBA — 2 tools
 
@@ -116,3 +118,43 @@ Os caminhos MCP sao **automaticamente corrigidos** a cada execucao do `opencode.
 ## Uso
 
 O LLM automaticamente descobre e usa essas ferramentas quando o usuario pede para criar/modificar documentos Office.
+
+## Criacao de Apresentacoes Profissionais com Templates
+
+Para criar apresentacoes com qualidade profissional (estilo Slidesgo/SlidesCarnival), use o sistema de templates baseado em clonagem.
+
+### Templates Disponiveis
+
+| Template | Estilo | Slides | Caminho |
+|----------|--------|--------|---------|
+| `clean_minimal` | Clean/Minimal/Moderno | 25 | `./data/templates/clean_minimal.pptx` |
+| `scrapbook_nature` | Artistico/Journal | 15 | `./data/templates/scrapbook_nature.pptx` |
+
+### Fluxo de Trabalho
+
+1. **Listar slots** do template para descobrir os indices editaveis:
+   ```
+   list_template_slots_pptx(template_path="./data/templates/clean_minimal.pptx")
+   ```
+   Retorna JSON com `slide_index` e `shape_index` de cada slot.
+
+2. **Criar com substituicoes**:
+   ```
+   create_from_template_pptx(
+     template_path="./data/templates/clean_minimal.pptx",
+     output_path="./projeto/astronomia.pptx",
+     slide_replacements='{
+       "0": {"10": "Ola Mundo", "11": "2026"},
+       "2": {"3": "SUMARIO"}
+     }'
+   )
+   ```
+
+3. **Resultado**: Nova apresentacao criada com formatacao 100% preservada (cores, fontes, layouts, imagens). Apenas os textos nos shapes especificados sao substituidos.
+
+### Vantagens deste Sistema
+
+- **Formatacao 100% preservada** - cores, fontes, layouts, imagens decorativas
+- **Visual profissional real** - layouts testados por designers
+- **Reaproveitamento** - mesmo template pode ser usado para varios projetos
+- **Identificacao precisa** - cada shape tem indice unico, sem ambiguidade
