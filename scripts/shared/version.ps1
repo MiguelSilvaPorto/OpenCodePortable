@@ -91,9 +91,19 @@ function Download-OpenCodeExe {
         $sw = [System.Diagnostics.Stopwatch]::StartNew()
         if ($LogDir) { Write-LogEntry -LogDir $LogDir -Stage "DOWNLOAD" -Event "START" -Context @{ url = $url; attempt = $attempt; max = $MAX_RETRIES } }
         try {
-            [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
-            $webClient = New-Object System.Net.WebClient
-            $webClient.DownloadFile($url, $zipPath)
+            # Configurar TLS 1.2 e TLS 1.3
+            [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12 -bor [Net.SecurityProtocolType]::Tls13
+            
+            try {
+                $webClient = New-Object System.Net.WebClient
+                $webClient.Headers.Add("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) OpenCodePortable")
+                $webClient.DownloadFile($url, $zipPath)
+            }
+            catch {
+                # Fallback usando Invoke-WebRequest
+                Invoke-WebRequest -Uri $url -OutFile $zipPath -UserAgent "Mozilla/5.0 (Windows NT 10.0; Win64; x64) OpenCodePortable" -UseBasicParsing
+            }
+            
             $sw.Stop()
             $bytes = (Get-Item $zipPath).Length
             if ($bytes -lt $MIN_ZIP_SIZE) {
