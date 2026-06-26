@@ -1413,6 +1413,12 @@ if (-not (Test-Path $OPENCODE_BIN))  { New-Item -ItemType Directory -Path $OPENC
 if (-not (Test-Path $OPENCODE_DATA)) { New-Item -ItemType Directory -Path $OPENCODE_DATA -Force | Out-Null }
 if (-not (Test-Path $OPENCODE_CONFIG)) { New-Item -ItemType Directory -Path $OPENCODE_CONFIG -Force | Out-Null }
 
+# Setup inicial (se necessario)
+$setupDone = Run-InitialSetup
+
+# Corrigir caminhos MCP no config (roda sempre, mesmo apos setup)
+Update-OpenCodeConfig
+
 function Handle-FatalExit {
     param([string]$Message)
     Write-Host ""
@@ -1509,12 +1515,6 @@ if ($exeStatus.valid) {
         Write-Log "UPDATE" "UP_TO_DATE" @{ version = $localVersion }
     }
 }
-
-# 2. Setup inicial (se necessario)
-$setupDone = Run-InitialSetup
-
-# 2.5. Corrigir caminhos MCP no config (roda sempre, mesmo apos setup)
-Update-OpenCodeConfig
 
 # 3. Seletor de projetos
 $providedPath = ""
