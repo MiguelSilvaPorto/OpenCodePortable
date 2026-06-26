@@ -480,7 +480,7 @@ function Run-InitialSetup {
                     [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12 -bor [Net.SecurityProtocolType]::Tls13
                     
                     # Executar instalacao com privilegios de administrador (UAC Prompt)
-                    $installCmd = "Set-ExecutionPolicy RemoteSigned -Scope CurrentUser -Force; [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12 -bor [Net.SecurityProtocolType]::Tls13; iwr -useb get.scoop.sh | iex"
+                    $installCmd = 'Set-ExecutionPolicy RemoteSigned -Scope CurrentUser -Force; [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12 -bor [Net.SecurityProtocolType]::Tls13; iex "& {$(irm get.scoop.sh)} -RunAsAdmin"'
                     Start-Process powershell.exe -ArgumentList "-NoProfile -ExecutionPolicy Bypass -Command `"$installCmd`"" -Verb RunAs -Wait
                     
                     # Forçar atualização do PATH local imediatamente após a instalação
@@ -496,8 +496,8 @@ function Run-InitialSetup {
                 $scoopInstalled = $null -ne (Get-Command scoop -ErrorAction SilentlyContinue)
                 if (-not $scoopInstalled) {
                     Write-Host "  [AVISO] Scoop nao pode ser configurado automaticamente." -ForegroundColor Yellow
-                    Write-Host "          Por favor, tente rodar este comando em um prompt de Administrador:" -ForegroundColor Yellow
-                    Write-Host "          powershell -ExecutionPolicy Bypass -Command `"iwr -useb get.scoop.sh | iex`"" -ForegroundColor Cyan
+                    Write-Host "          Por favor, tente rodar este comando em um prompt de PowerShell:" -ForegroundColor Yellow
+                    Write-Host "          iex `\"`& {`$(irm get.scoop.sh)} -RunAsAdmin`\"" -ForegroundColor Cyan
                 } else {
                     Write-Host "  [SCOOP] Scoop instalado e adicionado ao PATH local com sucesso!" -ForegroundColor Green
                 }
