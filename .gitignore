@@ -68,3 +68,5 @@ Projects/
 config/.env
 .env
 .env.local
+
+scripts/apps-config.ini
