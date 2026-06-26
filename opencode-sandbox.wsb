@@ -1,0 +1,12 @@
+<Configuration>
+  <MappedFolders>
+    <MappedFolder>
+      <HostFolder>d:\OpenCodePortable</HostFolder>
+      <SandboxFolder>C:\OpenCodePortable</SandboxFolder>
+      <ReadOnly>false</ReadOnly>
+    </MappedFolder>
+  </MappedFolders>
+  <LogonCommand>
+    <Command>powershell.exe -NoExit -ExecutionPolicy Bypass -Command "Write-Host '--------------------------------------------------' -ForegroundColor Green; Write-Host '   Ambiente de Testes Isolado (Windows Sandbox)   ' -ForegroundColor Green -BackgroundColor DarkGreen; Write-Host '--------------------------------------------------' -ForegroundColor Green; Write-Host 'Seu workspace foi montado em C:\OpenCodePortable.' -ForegroundColor Cyan; Write-Host 'Você pode executar os instaladores gerados para testar.' -ForegroundColor Cyan; cd C:\OpenCodePortable; Get-ChildItem -Filter *.exe"</Command>
+  </LogonCommand>
+</Configuration>
