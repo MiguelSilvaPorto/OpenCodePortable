@@ -25,18 +25,7 @@ try {
     console.warn(`[CONFIG] Falha ao ler ou analisar config existente: ${e.message}. Criando nova.`);
 }
 
-const defaultVoiceCfg = {
-    endpoint: process.env.GROQ_API_KEY ? "https://api.groq.com/openai/v1" : "http://localhost:11434/v1",
-    model: process.env.GROQ_API_KEY ? "llama-3.1-8b-instant" : "llama3.2"
-};
 
-if (process.env.GROQ_API_KEY) {
-    defaultVoiceCfg.apiKey = process.env.GROQ_API_KEY;
-    defaultVoiceCfg.apiKeyEnv = "GROQ_API_KEY";
-    defaultVoiceCfg.sttEndpoint = "https://api.groq.com/openai/v1";
-    defaultVoiceCfg.sttModel = "whisper-large-v3-turbo";
-    defaultVoiceCfg.sttApiKeyEnv = "GROQ_API_KEY";
-}
 
 if (!cfg) {
     cfg = {
@@ -107,14 +96,7 @@ if (!cfg) {
         cfg.mcp["web-search-mcp"].command = ["python", webSearchMcp];
     }
 
-    // Garantir remoção do plugin de voz TUI de opencode.jsonc (ele pertence exclusivamente ao tui.json)
-    if (cfg.plugin && Array.isArray(cfg.plugin)) {
-        cfg.plugin = cfg.plugin.filter(p => {
-            if (Array.isArray(p) && p[0] === "@renjfk/opencode-voice") return false;
-            if (p === "@renjfk/opencode-voice") return false;
-            return true;
-        });
-    }
+
 }
 
 // Escrever de volta com indentação limpa e formato JSON correto

@@ -15,4 +15,10 @@ if %errorlevel% neq 0 (
 :: Chamar o orquestrador principal em PowerShell repassando todos os parâmetros
 powershell -NoProfile -ExecutionPolicy Bypass -File "%OPENCODE_HOME%opencode.ps1" %*
 
+if %errorlevel% neq 0 (
+    echo.
+    echo [ERRO] O OpenCode falhou ao iniciar - Codigo: %errorlevel%
+    pause
+)
+
 exit /b %errorlevel%

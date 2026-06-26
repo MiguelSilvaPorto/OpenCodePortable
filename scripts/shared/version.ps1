@@ -24,7 +24,7 @@ function Test-OpenCodeExe {
 function Get-LatestVersion {
     param(
         [string]$CacheFile,
-        [string]$GitHubRepo = "anomalyco/opencode",
+        [string]$GitHubRepo = "MiguelSilvaPorto/OpenCodePortable",
         [string]$FallbackVersion = "1.17.7",
         [string]$LogDir
     )
@@ -76,7 +76,7 @@ function Download-OpenCodeExe {
     param(
         [string]$Version,
         [string]$BinDir,
-        [string]$GitHubRepo = "anomalyco/opencode",
+        [string]$GitHubRepo = "MiguelSilvaPorto/OpenCodePortable",
         [string]$LogDir
     )
     $MAX_RETRIES = 3

@@ -36,7 +36,7 @@ $MIN_ZIP_SIZE      = 5MB
 $CACHE_TTL_HOURS   = 24
 $MAX_RETRIES       = 3
 $FALLBACK_VERSION  = "1.17.7"
-$GITHUB_REPO       = "anomalyco/opencode"
+$GITHUB_REPO       = "MiguelSilvaPorto/OpenCodePortable"
 
 $LOG_MAX_SIZE      = 10MB
 $LOG_MAX_FILES     = 5
@@ -144,6 +144,85 @@ function Rotate-Logs {
     }
 }
 
+function Center-Text {
+    param(
+        [string]$Text,
+        [string]$ForegroundColor = "Cyan"
+    )
+    $consoleWidth = $Host.UI.RawUI.WindowSize.Width
+    if ($consoleWidth -le 0) { $consoleWidth = 80 }
+    $pad = [math]::max(0, [math]::round(($consoleWidth - $Text.Length) / 2))
+    Write-Host (" " * $pad + $Text) -ForegroundColor $ForegroundColor
+}
+
+function Show-SplashScreen {
+    param(
+        [switch]$NoDelay
+    )
+    try {
+        [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
+        $OutputEncoding = [System.Text.Encoding]::UTF8
+    } catch {}
+    
+    Clear-Host
+    Write-Host ""
+    $logo = @(
+        "   ____                    ______          __",
+        "  / __ \____  ___  ____   / ____/___  ____/ /__",
+        " / / / / __ \/ _ \/ __ \ / /   / __ \/ __  / _ \",
+        "/ /_/ / /_/ /  __/ / / // /___/ /_/ / /_/ /  __/",
+        "\____/ .___/\___/_/ /_/ \____/\____/\__,_/\___/",
+        "    /_/"
+    )
+    
+    # Encontrar a largura maxima do bloco do logo para centralizar de forma alinhada
+    $maxWidth = 0
+    foreach ($line in $logo) {
+        if ($line.Length -gt $maxWidth) { $maxWidth = $line.Length }
+    }
+    
+    $consoleWidth = $Host.UI.RawUI.WindowSize.Width
+    if ($consoleWidth -le 0) { $consoleWidth = 80 }
+    $blockPad = [math]::max(0, [math]::round(($consoleWidth - $maxWidth) / 2))
+    
+    foreach ($line in $logo) {
+        Write-Host (" " * $blockPad + $line) -ForegroundColor Cyan
+        if (-not $NoDelay) { Start-Sleep -Milliseconds 30 }
+    }
+    Write-Host ""
+    Center-Text "========================================================" "DarkGray"
+    Center-Text "             INICIALIZANDO PORTABLE ENVIRONMENT           " "Gray"
+    Center-Text "========================================================" "DarkGray"
+    Write-Host ""
+}
+
+function Render-Progress {
+    param(
+        [int]$Percent,
+        [string]$Status
+    )
+    
+    # Redesenhar a splash screen para recalcular o alinhamento central em caso de resize da janela
+    Show-SplashScreen -NoDelay
+    
+    $width = 30
+    $filledCount = [math]::Round(($Percent / 100) * $width)
+    $filled = "=" * $filledCount
+    $empty = "-" * ($width - $filledCount)
+    
+    $barText = "Carregando: [$filled$empty] $Percent%"
+    
+    $consoleWidth = $Host.UI.RawUI.WindowSize.Width
+    if ($consoleWidth -le 0) { $consoleWidth = 80 }
+    
+    $barPad = [math]::max(0, [math]::round(($consoleWidth - $barText.Length) / 2))
+    $statusPad = [math]::max(0, [math]::round(($consoleWidth - $Status.Length) / 2))
+    
+    Write-Host (" " * $barPad + $barText) -ForegroundColor Green
+    Write-Host (" " * $statusPad + $Status) -ForegroundColor Gray
+    Write-Host ""
+}
+
 function Write-Log {
     param(
         [string]$Stage,
@@ -180,15 +259,35 @@ function Write-Log {
     if (Test-Path $LOG_LATEST) { Remove-Item $LOG_LATEST -Force }
     Copy-Item -Path $LOG_FILE -Destination $LOG_LATEST -Force
 
-    # Console colorido
-    $color = switch ($Level) {
-        "ERROR"   { "Red" }
-        "SUCCESS" { "Green" }
-        "WARN"    { "Yellow" }
-        default   { "Cyan" }
+    # Em vez de imprimir logs no console, atualiza a barra de progresso!
+    if ($Level -eq "ERROR") {
+        $ts = (Get-Date).ToString("HH:mm:ss")
+        try {
+            [Console]::SetCursorPosition(0, 15)
+            Write-Host "[$ts] [$Stage] ERRO: $Event" -ForegroundColor Red
+        } catch {
+            Write-Host "`n[$ts] [$Stage] ERRO: $Event" -ForegroundColor Red
+        }
+    } else {
+        $percent = 0
+        $statusText = ""
+        
+        switch ("$Stage-$Event") {
+            "SYSTEM-START"          { $percent = 10; $statusText = "Garantindo diretorios..." }
+            "SYSTEM-EXE_OK"         { $percent = 30; $statusText = "Executavel opencode.exe verificado." }
+            "VERSION-CACHE_HIT"     { $percent = 50; $statusText = "Verificando cache de versao..." }
+            "VERSION-API_SUCCESS"   { $percent = 55; $statusText = "Conectado ao servidor de atualizacoes." }
+            "UPDATE-UP_TO_DATE"     { $percent = 70; $statusText = "Sistema atualizado." }
+            "SETUP-COMPLETED"       { $percent = 85; $statusText = "Setup concluido com sucesso." }
+            "SETUP-SKIPPED"         { $percent = 85; $statusText = "Ambiente e dependencias prontos." }
+            "CONFIG-UPDATED"        { $percent = 95; $statusText = "Configuracoes otimizadas." }
+            "LAUNCH-START"          { $percent = 100; $statusText = "Iniciando OpenCode..." }
+        }
+        
+        if ($percent -gt 0) {
+            Render-Progress -Percent $percent -Status $statusText
+        }
     }
-    $ts = (Get-Date).ToString("HH:mm:ss")
-    Write-Host "[$ts] [$Stage] $Event" -ForegroundColor $color
 }
 
 # ============================================================================
@@ -211,8 +310,8 @@ function Test-OpenCodeExe {
 
     # Testar execucao
     try {
-        $version = & $ExePath --version 2>&1 | Select-Object -First 1
-        if ($version -match '(\d+\.\d+\.\d+)') {
+        $version = (& $ExePath --version 2>&1 | Select-Object -First 1).Trim()
+        if ($version -match '([\w\.\-\s]+)') {
             return @{ exists = $true; valid = $true; version = $Matches[1]; size = $size }
         }
         return @{ exists = $true; valid = $false; reason = "VERSION_PARSE_FAIL"; size = $size }
@@ -394,6 +493,30 @@ function Run-InitialSetup {
                     Write-Host "          powershell -ExecutionPolicy Bypass -Command `"iwr -useb get.scoop.sh | iex`"" -ForegroundColor Cyan
                 } else {
                     Write-Host "  [SCOOP] Scoop instalado e adicionado ao PATH local com sucesso!" -ForegroundColor Green
+                }
+            }
+        },
+        @{
+            name = "GIT"
+            check = { $null -ne (Get-Command git -ErrorAction SilentlyContinue) }
+            install = {
+                Write-Host "  Instalando Git (necessario para controle de versao)..." -ForegroundColor Gray
+                $winget = Get-Command winget -ErrorAction SilentlyContinue
+                if ($winget) {
+                    try {
+                        Write-Host "    Instalando Git via winget (silencioso)..." -ForegroundColor Gray
+                        & winget install --id Git.Git -e -s winget --silent --accept-package-agreements --accept-source-agreements 2>$null
+                        $env:Path = [Environment]::GetEnvironmentVariable("Path", "Machine") + ";" + [Environment]::GetEnvironmentVariable("Path", "User")
+                    } catch {
+                        Write-Host "    [AVISO] Falha ao instalar Git via winget." -ForegroundColor Yellow
+                    }
+                } else {
+                    $scoop = Get-Command scoop -ErrorAction SilentlyContinue
+                    if ($scoop) {
+                        Write-Host "    Instalando Git via Scoop..." -ForegroundColor Gray
+                        & scoop install git 2>$null
+                        $env:Path = [Environment]::GetEnvironmentVariable("Path", "Machine") + ";" + [Environment]::GetEnvironmentVariable("Path", "User")
+                    }
                 }
             }
         },
@@ -1142,7 +1265,6 @@ if ($env:OS -eq "Windows_NT") {
         
         $scriptPath = $MyInvocation.MyCommand.Path
         $wtArgs = "powershell.exe -NoProfile -ExecutionPolicy Bypass -File `"$scriptPath`" $($argList -join ' ')"
-        
         Start-Process $wtPath -ArgumentList $wtArgs
         exit 0
     }
@@ -1207,6 +1329,12 @@ if ($Arguments -and ($Arguments[0] -eq "--set-groq" -or $Arguments[0] -eq "-groq
     }
 }
 
+# Show-SplashScreen ja foi definido acima
+
+Show-SplashScreen
+
+Write-Log "SYSTEM" "START"
+
 # Garantir diretorios
 if (-not (Test-Path $OPENCODE_BIN))  { New-Item -ItemType Directory -Path $OPENCODE_BIN -Force | Out-Null }
 if (-not (Test-Path $OPENCODE_DATA)) { New-Item -ItemType Directory -Path $OPENCODE_DATA -Force | Out-Null }
@@ -1251,7 +1379,7 @@ if ($exeStatus.valid) {
     $latestVersion = Get-LatestVersion
     $localVersion = $exeStatus.version
 
-    if ($latestVersion -and $localVersion -and ($latestVersion -ne $localVersion)) {
+    if ($latestVersion -and $localVersion -and ($localVersion -ne "0.0.0") -and ($localVersion -notlike "*dev*") -and ($localVersion -notlike "*beta*") -and ($localVersion -notlike "*local*") -and ($latestVersion -ne $localVersion)) {
         Write-Host "" -ForegroundColor Yellow
         Write-Host "============================================" -ForegroundColor Yellow
         Write-Host "  Nova versao disponivel!" -ForegroundColor Yellow
@@ -1311,12 +1439,7 @@ if ($Arguments.Count -gt 0) {
 
 $projectPath = Select-Project -ProvidedPath $providedPath
 
-# 3.5. Garantir patches de portabilidade e fallback no voice plugin (roda sempre antes de abrir)
-$patchScript = Join-Path $OPENCODE_HOME "scripts\patch_stt.ps1"
-if (Test-Path $patchScript) {
-    Write-Log "LAUNCH" "PATCHING_STT" @{ script = $patchScript }
-    & $patchScript
-}
+
 
 # 4. Executar OpenCode
 Invoke-OpenCode -ProjectPath $projectPath
