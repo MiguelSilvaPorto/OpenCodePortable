@@ -264,7 +264,7 @@ function Write-Log {
         $ts = (Get-Date).ToString("HH:mm:ss")
         try {
             [Console]::SetCursorPosition(0, 15)
-            Write-Host "[$ts] [$Stage] ERRO: $Event" -ForegroundColor Red
+            Write-Host ("[$ts] [$Stage] ERRO: $Event".PadRight(100)) -ForegroundColor Red
         } catch {
             Write-Host "`n[$ts] [$Stage] ERRO: $Event" -ForegroundColor Red
         }
@@ -1340,6 +1340,26 @@ if (-not (Test-Path $OPENCODE_BIN))  { New-Item -ItemType Directory -Path $OPENC
 if (-not (Test-Path $OPENCODE_DATA)) { New-Item -ItemType Directory -Path $OPENCODE_DATA -Force | Out-Null }
 if (-not (Test-Path $OPENCODE_CONFIG)) { New-Item -ItemType Directory -Path $OPENCODE_CONFIG -Force | Out-Null }
 
+function Handle-FatalExit {
+    param([string]$Message)
+    Write-Host ""
+    Write-Host "[ERRO] $Message" -ForegroundColor Red
+    Write-Host "       Log: $LOG_FILE" -ForegroundColor Gray
+    Write-Host ""
+    $choice = Read-Host "Deseja enviar os logs de diagnostico para analise de erro? (S/N)"
+    if ($choice -match "[sS]") {
+        $sendLogsScript = Join-Path $OPENCODE_HOME "scripts\send_logs.ps1"
+        if (Test-Path $sendLogsScript) {
+            Write-Host "Iniciando envio de logs..." -ForegroundColor Cyan
+            powershell -NoProfile -ExecutionPolicy Bypass -File $sendLogsScript
+        } else {
+            Write-Host "[ERRO] Script de envio de logs nao encontrado em: $sendLogsScript" -ForegroundColor Red
+        }
+    }
+    Read-Host "Pressione Enter para sair"
+    exit 1
+}
+
 # 1. Verificar executavel
 $exePath = Join-Path $OPENCODE_BIN "opencode.exe"
 $exeStatus = Test-OpenCodeExe $exePath
@@ -1356,10 +1376,7 @@ elseif ($exeStatus.exists -and -not $exeStatus.valid) {
     $downloaded = Download-OpenCodeExe $version
     if (-not $downloaded) {
         Write-Log "SYSTEM" "FATAL" @{ reason = "DOWNLOAD_FAILED" } "ERROR"
-        Write-Host "[ERRO] Nao foi possivel baixar o opencode.exe. Verifique sua conexao." -ForegroundColor Red
-        Write-Host "       Log: $LOG_FILE" -ForegroundColor Gray
-        Read-Host "Pressione Enter para sair"
-        exit 1
+        Handle-FatalExit -Message "Nao foi possivel baixar o opencode.exe. Verifique sua conexao."
     }
 }
 else {
@@ -1368,10 +1385,7 @@ else {
     $downloaded = Download-OpenCodeExe $version
     if (-not $downloaded) {
         Write-Log "SYSTEM" "FATAL" @{ reason = "DOWNLOAD_FAILED" } "ERROR"
-        Write-Host "[ERRO] Nao foi possivel baixar o opencode.exe. Verifique sua conexao." -ForegroundColor Red
-        Write-Host "       Log: $LOG_FILE" -ForegroundColor Gray
-        Read-Host "Pressione Enter para sair"
-        exit 1
+        Handle-FatalExit -Message "Nao foi possivel baixar o opencode.exe. Verifique sua conexao."
     }
 }
 # 1.5. Verificar se ha atualizacao disponivel
@@ -1408,9 +1422,7 @@ if ($exeStatus.valid) {
                 # Tentar restaurar a versao anterior
                 $downloaded = Download-OpenCodeExe $localVersion
                 if (-not $downloaded) {
-                    Write-Host "  [ERRO FATAL] Nao foi possivel restaurar. Verifique sua conexao." -ForegroundColor Red
-                    Read-Host "Pressione Enter para sair"
-                    exit 1
+                    Handle-FatalExit -Message "Nao foi possivel restaurar. Verifique sua conexao."
                 }
             }
         }
