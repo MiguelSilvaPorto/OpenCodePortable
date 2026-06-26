@@ -20,7 +20,7 @@ Ele visa:
 O deploy do OpenCode Portable pode ser feito de duas formas:
 
 ### Método 1: Usando o Instalador Automatizado (Recomendado)
-1. Baixe o instalador mais recente: **[OpenCodeSetup-beta_v1_r13.exe](https://github.com/MiguelSilvaPorto/OpenCodePortable/releases/download/vbeta_v1_r13/OpenCodeSetup-beta_v1_r13.exe)**.
+1. Baixe o instalador mais recente: **[OpenCodeSetup-beta_v1_r14.exe](https://github.com/MiguelSilvaPorto/OpenCodePortable/releases/download/vbeta_v1_r14/OpenCodeSetup-beta_v1_r14.exe)**.
 2. Execute o instalador. Se uma versão anterior do OpenCode for detectada no seu sistema, o instalador perguntará de forma inteligente se você deseja:
    - **Desinstalar**: Realiza a desinstalação silenciosa da versão antiga para fazer uma instalação limpa.
    - **Atualizar**: Sobrescreve apenas os arquivos e atualiza a pasta atual de programas.
