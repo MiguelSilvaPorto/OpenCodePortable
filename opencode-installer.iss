@@ -44,6 +44,8 @@ Source: "d:\OpenCodePortable\docs\*"; DestDir: "{app}\docs"; Flags: ignoreversio
 Source: "d:\OpenCodePortable\scripts\*"; DestDir: "{app}\scripts"; Flags: ignoreversion recursesubdirs createallsubdirs
 Source: "d:\OpenCodePortable\tools\*"; DestDir: "{app}\tools"; Flags: ignoreversion recursesubdirs createallsubdirs
 Source: "d:\OpenCodePortable\.opencode\*"; DestDir: "{app}\.opencode"; Flags: ignoreversion recursesubdirs createallsubdirs
+Source: "d:\OpenCodePortable\.brain\*"; DestDir: "{app}\.brain"; Flags: ignoreversion recursesubdirs createallsubdirs
+
 
 [Icons]
 ; Atalhos apontando para o launcher do PowerShell
