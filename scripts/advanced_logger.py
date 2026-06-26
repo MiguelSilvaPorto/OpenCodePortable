@@ -172,6 +172,8 @@ class DiagnosticsLogger:
         self.launcher_offset = 0
         self.native_offset = 0
         self.last_crash = None
+        self.full_log_lines = []
+        self.errors_log_lines = []
 
     def read_launcher_log(self):
         """Lê incrementalmente o log do launcher."""
@@ -248,18 +250,14 @@ class DiagnosticsLogger:
         formatted_ts = format_timestamp(ts)
         log_line = f"[{formatted_ts}] [{level}] [{source}] [{component}] {msg}\n"
 
-        # 1. Escrever no log completo
-        with open(FULL_LOG_PATH, 'a', encoding='utf-8') as f:
-            f.write(log_line)
+        self.full_log_lines.append(log_line)
 
         # 2. Verificar se é erro/aviso
         is_error = level in ["ERROR", "CRITICAL", "FATAL"]
         is_warn = level == "WARN"
 
         if is_error or is_warn:
-            # Escrever no log de erros
-            with open(ERRORS_LOG_PATH, 'a', encoding='utf-8') as f:
-                f.write(log_line)
+            self.errors_log_lines.append(log_line)
 
             # Guardar histórico estruturado
             error_entry = {
@@ -275,6 +273,20 @@ class DiagnosticsLogger:
             # Se for erro crítico (não apenas aviso), atualizar último crash
             if is_error:
                 self.last_crash = error_entry
+
+    def flush(self):
+        """Escreve as linhas acumuladas nos arquivos de log correspondentes."""
+        if self.full_log_lines:
+            LOG_DIR.mkdir(parents=True, exist_ok=True)
+            with open(FULL_LOG_PATH, 'a', encoding='utf-8') as f:
+                f.writelines(self.full_log_lines)
+            self.full_log_lines.clear()
+
+        if self.errors_log_lines:
+            LOG_DIR.mkdir(parents=True, exist_ok=True)
+            with open(ERRORS_LOG_PATH, 'a', encoding='utf-8') as f:
+                f.writelines(self.errors_log_lines)
+            self.errors_log_lines.clear()
 
     def write_crash_report(self):
         """Escreve o arquivo crash-report.md com a falha mais recente."""
@@ -418,6 +430,7 @@ def run_single_generation():
     logger = DiagnosticsLogger()
     logger.read_launcher_log()
     logger.read_native_log()
+    logger.flush()
     
     logger.write_crash_report()
     logger.write_errors_history()
@@ -445,6 +458,7 @@ def run_monitor_loop():
             # Ler logs dinamicamente
             logger.read_launcher_log()
             logger.read_native_log()
+            logger.flush()
             
             # Atualizar os Markdowns e ZIP se detectou alguma novidade
             if logger.errors_list:
@@ -467,6 +481,7 @@ def run_monitor_loop():
         # Uma última leitura final de fechamento antes de sair
         logger.read_launcher_log()
         logger.read_native_log()
+        logger.flush()
         logger.write_crash_report()
         logger.write_errors_history()
         logger.make_zip()

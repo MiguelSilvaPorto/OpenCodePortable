@@ -36,6 +36,8 @@ Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{
 Source: "d:\OpenCodePortable\opencode.ps1"; DestDir: "{app}"; Flags: ignoreversion
 Source: "d:\OpenCodePortable\opencode.bat"; DestDir: "{app}"; Flags: ignoreversion
 
+Source: "d:\OpenCodePortable\send-logs.bat"; DestDir: "{app}"; Flags: ignoreversion
+
 ; Subpastas necessárias para a execução
 Source: "d:\OpenCodePortable\bin\*"; DestDir: "{app}\bin"; Flags: ignoreversion recursesubdirs createallsubdirs
 Source: "d:\OpenCodePortable\config\*"; DestDir: "{app}\config"; Flags: ignoreversion recursesubdirs createallsubdirs
@@ -51,6 +53,8 @@ Source: "d:\OpenCodePortable\.brain\*"; DestDir: "{app}\.brain"; Flags: ignoreve
 ; Atalhos apontando para o launcher do PowerShell
 Name: "{group}\{#MyAppName}"; Filename: "powershell.exe"; Parameters: "-NoProfile -ExecutionPolicy Bypass -File ""{app}\opencode.ps1"""; IconFilename: "{app}\bin\app.ico"; Comment: "Iniciar o OpenCode"
 Name: "{autodesktop}\{#MyAppName}"; Filename: "powershell.exe"; Parameters: "-NoProfile -ExecutionPolicy Bypass -File ""{app}\opencode.ps1"""; IconFilename: "{app}\bin\app.ico"; Tasks: desktopicon; Comment: "Iniciar o OpenCode"
+Name: "{group}\Enviar Logs de Diagnostico"; Filename: "{app}\send-logs.bat"; Comment: "Enviar logs de diagnostico para o GitHub"
+
 Name: "{group}\Desinstalar {#MyAppName}"; Filename: "{uninstallexe}"; Comment: "Desinstalar o OpenCode"
 
 [Run]
