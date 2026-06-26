@@ -89,7 +89,7 @@ function Run-InitialSetup {
                 Write-Host "  Instalando Scoop..." -ForegroundColor Gray
                 try {
                     [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12 -bor [Net.SecurityProtocolType]::Tls13
-                    $installCmd = "Set-ExecutionPolicy RemoteSigned -Scope CurrentUser -Force; [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12 -bor [Net.SecurityProtocolType]::Tls13; iwr -useb get.scoop.sh | iex"
+                    $installCmd = 'Set-ExecutionPolicy RemoteSigned -Scope CurrentUser -Force; [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12 -bor [Net.SecurityProtocolType]::Tls13; iex "& {$(irm get.scoop.sh)} -RunAsAdmin"'
                     Start-Process powershell.exe -ArgumentList "-NoProfile -ExecutionPolicy Bypass -Command `"$installCmd`"" -Verb RunAs -Wait
                     $scoopShimPath = Join-Path $env:USERPROFILE "scoop\shims"
                     if (Test-Path $scoopShimPath) { $env:PATH = "$scoopShimPath;$env:PATH" }
