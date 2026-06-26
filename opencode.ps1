@@ -1379,7 +1379,7 @@ if ($exeStatus.valid) {
     $latestVersion = Get-LatestVersion
     $localVersion = $exeStatus.version
 
-    if ($latestVersion -and $localVersion -and ($localVersion -ne "0.0.0") -and ($localVersion -notlike "*dev*") -and ($localVersion -notlike "*beta*") -and ($localVersion -notlike "*local*") -and ($latestVersion -ne $localVersion)) {
+    if ($latestVersion -and $localVersion -and ($localVersion -ne "0.0.0") -and ($localVersion -notlike "*dev*") -and ($localVersion -notlike "*local*") -and ($latestVersion -ne $localVersion)) {
         Write-Host "" -ForegroundColor Yellow
         Write-Host "============================================" -ForegroundColor Yellow
         Write-Host "  Nova versao disponivel!" -ForegroundColor Yellow
