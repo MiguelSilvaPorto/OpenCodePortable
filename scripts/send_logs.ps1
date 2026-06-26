@@ -60,12 +60,14 @@ Write-Host "  [3/3] Enviando relatorio para o GitHub..." -ForegroundColor Gray
 
 $ERRORS_LOG = Join-Path $LOG_DIR "advanced_errors.log"
 $LAUNCHER_LOG = Join-Path $LOG_DIR "launcher.jsonl"
+$FULL_LOG = Join-Path $LOG_DIR "advanced_full.log"
 
 $filesToUpload = @()
 if (Test-Path $REPORT_PATH) { $filesToUpload += $REPORT_PATH }
 if (Test-Path $HISTORY_PATH) { $filesToUpload += $HISTORY_PATH }
 if (Test-Path $ERRORS_LOG) { $filesToUpload += $ERRORS_LOG }
 if (Test-Path $LAUNCHER_LOG) { $filesToUpload += $LAUNCHER_LOG }
+if (Test-Path $FULL_LOG) { $filesToUpload += $FULL_LOG }
 
 $gistUrl = ""
 if ($filesToUpload.Count -gt 0) {
@@ -87,7 +89,9 @@ $title = "OpenCode Portable: Relatorio de Erros - $(Get-Date -Format 'dd/MM/yyyy
 $body = "Enviado automaticamente pelo utilitario de logs do OpenCode Portable.`n`n"
 
 if ($gistUrl -match "https://gist.github.com/") {
-    $body += "Logs e Diagnosticos Completos (Gist): $gistUrl`n`n"
+    $gistZipUrl = $gistUrl + "/archive/main.zip"
+    $body += "Logs e Diagnosticos Online (Gist): $gistUrl`n"
+    $body += "Baixar todos os logs (ZIP): [$gistZipUrl]($gistZipUrl)`n`n"
 } else {
     $body += "Nota: Os logs locais nao puderam ser enviados via Gist. Verifique a pasta local data/logs para o arquivo ZIP de diagnostico.`n`n"
 }

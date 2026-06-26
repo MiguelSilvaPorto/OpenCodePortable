@@ -248,7 +248,7 @@ class DiagnosticsLogger:
     def process_entry(self, ts: str, level: str, source: str, component: str, msg: str, raw_data: dict):
         """Processa e armazena cada linha de log formatada."""
         formatted_ts = format_timestamp(ts)
-        log_line = f"[{formatted_ts}] [{level}] [{source}] [{component}] {msg}\n"
+        log_line = f"[{formatted_ts}] [{level:<8}] [{source:<8}] [{component:<12}] {msg}\n"
 
         self.full_log_lines.append(log_line)
 
@@ -325,23 +325,31 @@ class DiagnosticsLogger:
             if m_file:
                 err_file = os.path.basename(m_file.group(1))
 
-        report_md = f"""# Relatório de Falha do OpenCode Portable
+        report_md = f"""# Relatorio de Falha - OpenCode Portable
 
-**Data e Hora:** {date_str}
-**Componente Afetado:** {comp}
-**Arquivo de Origem:** {err_file}
-**Linha do Erro:** {err_line}
+| Informacao | Detalhe |
+| :--- | :--- |
+| **Data e Hora** | {date_str} |
+| **Componente Afetado** | {comp} |
+| **Arquivo de Origem** | `{err_file}` |
+| **Linha do Erro** | `{err_line}` |
 
 ## O que aconteceu?
+```text
 {reason}
+```
 
-## Detalhes Técnicos / Variáveis de Contexto
+<details>
+<summary>Clique para ver detalhes tecnicos completos</summary>
+
 ```text
 {details.strip()}
 ```
 
+</details>
+
 ---
-*Este relatório foi gerado em tempo real pelo Monitor de Logs do OpenCode em Python.*
+*Este relatorio foi gerado em tempo real pelo Monitor de Logs do OpenCode em Python.*
 """
         with open(CRASH_REPORT_PATH, 'w', encoding='utf-8') as f:
             f.write(report_md)
