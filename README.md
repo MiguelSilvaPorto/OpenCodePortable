@@ -20,7 +20,7 @@ Ele visa:
 O deploy do OpenCode Portable pode ser feito de duas formas:
 
 ### Método 1: Usando o Instalador Automatizado (Recomendado)
-1. Baixe o instalador mais recente: **[OpenCodeSetup-beta_v1_r8.exe](file:///d:/OpenCodePortable/installers/OpenCodeSetup-beta_v1_r8.exe)**.
+1. Baixe o instalador mais recente: **[OpenCodeSetup-beta_v1_r8.exe](https://github.com/MiguelSilvaPorto/OpenCodePortable/releases/download/vbeta_v1_r8/OpenCodeSetup-beta_v1_r8.exe)**.
 2. Execute o instalador. Se uma versão anterior do OpenCode for detectada no seu sistema, o instalador perguntará de forma inteligente se você deseja:
    - **Desinstalar**: Realiza a desinstalação silenciosa da versão antiga para fazer uma instalação limpa.
    - **Atualizar**: Sobrescreve apenas os arquivos e atualiza a pasta atual de programas.
@@ -32,6 +32,16 @@ O deploy do OpenCode Portable pode ser feito de duas formas:
 ### Método 2: Execução Direta (Portátil)
 1. Baixe ou clone os arquivos do repositório para uma pasta local (ex: `D:\OpenCodePortable`).
 2. Execute o launcher portátil sem necessitar de instalação.
+
+---
+
+## 🔄 Atualizações Automáticas
+
+O OpenCode Portable possui um sistema de atualização inteligente integrado:
+- Sempre que você iniciar o ambiente através do `opencode.ps1` ou `opencode.bat`, o launcher verificará no repositório GitHub se existe uma versão/release mais recente disponível.
+- Se uma nova versão for detectada (ex: `vbeta_v1_r8` sendo mais recente que a instalada localmente), ele exibirá um aviso em amarelo e perguntará: `Deseja atualizar agora? (S/N)`.
+- Se você responder **S** (Sim), ele fará o download automático do ZIP da nova versão (`opencode-windows-x64.zip`), extrairá os arquivos, atualizará o executável e reiniciará o aplicativo de forma automática e transparente.
+
 
 ---
 
