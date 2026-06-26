@@ -331,7 +331,7 @@ function Get-LatestVersion {
         try {
             $cache = Get-Content $CACHE_FILE -Raw | ConvertFrom-Json
             $age = (Get-Date) - [datetime]$cache.timestamp
-            if ($age.TotalHours -lt $CACHE_TTL_HOURS) {
+            if ($age.TotalHours -lt $CACHE_TTL_HOURS -and $cache.version -like "*beta*") {
                 Write-Log "VERSION" "CACHE_HIT" @{ version = $cache.version; age_hours = [math]::Round($age.TotalHours, 1) }
                 return $cache.version
             }
