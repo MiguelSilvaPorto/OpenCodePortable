@@ -508,21 +508,87 @@ function Run-InitialSetup {
             check = { $null -ne (Get-Command git -ErrorAction SilentlyContinue) }
             install = {
                 Write-Host "  Instalando Git (necessario para controle de versao)..." -ForegroundColor Gray
+                $installed = $false
                 $winget = Get-Command winget -ErrorAction SilentlyContinue
                 if ($winget) {
                     try {
                         Write-Host "    Instalando Git via winget (silencioso)..." -ForegroundColor Gray
                         & winget install --id Git.Git -e -s winget --silent --accept-package-agreements --accept-source-agreements 2>$null
                         $env:Path = [Environment]::GetEnvironmentVariable("Path", "Machine") + ";" + [Environment]::GetEnvironmentVariable("Path", "User")
-                    } catch {
-                        Write-Host "    [AVISO] Falha ao instalar Git via winget." -ForegroundColor Yellow
-                    }
-                } else {
+                        $installed = $null -ne (Get-Command git -ErrorAction SilentlyContinue)
+                    } catch {}
+                }
+                if (-not $installed) {
                     $scoop = Get-Command scoop -ErrorAction SilentlyContinue
                     if ($scoop) {
                         Write-Host "    Instalando Git via Scoop..." -ForegroundColor Gray
                         & scoop install git 2>$null
                         $env:Path = [Environment]::GetEnvironmentVariable("Path", "Machine") + ";" + [Environment]::GetEnvironmentVariable("Path", "User")
+                        $installed = $null -ne (Get-Command git -ErrorAction SilentlyContinue)
+                    }
+                }
+                if (-not $installed) {
+                    try {
+                        $installerPath = Join-Path $OPENCODE_DATA "installers\git_installer.exe"
+                        Write-Host "    Metodo 3: Download direto github.com/git-for-windows..." -ForegroundColor Gray
+                        Invoke-WebRequest -Uri "https://github.com/git-for-windows/git/releases/download/v2.45.2.windows.1/Git-2.45.2-64-bit.exe" -OutFile $installerPath -UserAgent "Mozilla/5.0" -UseBasicParsing
+                        if (Test-Path $installerPath) {
+                            Write-Host "    Instalando Git silenciosamente (UAC)..." -ForegroundColor Gray
+                            $proc = Start-Process $installerPath -ArgumentList "/VERYSILENT /NORESTART /NOCANCEL /SP-" -Verb RunAs -Wait -PassThru
+                            if ($proc.ExitCode -eq 0) {
+                                Write-Host "    Git instalado com sucesso!" -ForegroundColor Green
+                                $env:Path = [Environment]::GetEnvironmentVariable("Path", "Machine") + ";" + [Environment]::GetEnvironmentVariable("Path", "User")
+                            }
+                        }
+                    } catch {
+                        Write-Host "    [AVISO] Falha ao instalar Git: $($_.Exception.Message)" -ForegroundColor Yellow
+                    } finally {
+                        if (Test-Path $installerPath) { Remove-Item $installerPath -Force -ErrorAction SilentlyContinue }
+                    }
+                }
+            }
+        },
+        @{
+            name = "GH"
+            check = { $null -ne (Get-Command gh -ErrorAction SilentlyContinue) }
+            install = {
+                Write-Host "  Instalando GitHub CLI (gh - necessario para logs)..." -ForegroundColor Gray
+                $installed = $false
+                $winget = Get-Command winget -ErrorAction SilentlyContinue
+                if ($winget) {
+                    try {
+                        Write-Host "    Instalando GitHub CLI via winget..." -ForegroundColor Gray
+                        & winget install --id GitHub.cli -e -s winget --silent --accept-package-agreements --accept-source-agreements 2>$null
+                        $env:Path = [Environment]::GetEnvironmentVariable("Path", "Machine") + ";" + [Environment]::GetEnvironmentVariable("Path", "User")
+                        $installed = $null -ne (Get-Command gh -ErrorAction SilentlyContinue)
+                    } catch {}
+                }
+                if (-not $installed) {
+                    $scoop = Get-Command scoop -ErrorAction SilentlyContinue
+                    if ($scoop) {
+                        Write-Host "    Instalando GitHub CLI via Scoop..." -ForegroundColor Gray
+                        & scoop install gh 2>$null
+                        $env:Path = [Environment]::GetEnvironmentVariable("Path", "Machine") + ";" + [Environment]::GetEnvironmentVariable("Path", "User")
+                        $installed = $null -ne (Get-Command gh -ErrorAction SilentlyContinue)
+                    }
+                }
+                if (-not $installed) {
+                    try {
+                        $installerPath = Join-Path $OPENCODE_DATA "installers\gh_installer.msi"
+                        Write-Host "    Metodo 3: Download direto github.com/cli/cli..." -ForegroundColor Gray
+                        Invoke-WebRequest -Uri "https://github.com/cli/cli/releases/download/v2.51.0/gh_2.51.0_windows_amd64.msi" -OutFile $installerPath -UserAgent "Mozilla/5.0" -UseBasicParsing
+                        if (Test-Path $installerPath) {
+                            Write-Host "    Instalando GitHub CLI silenciosamente (UAC)..." -ForegroundColor Gray
+                            $proc = Start-Process msiexec.exe -ArgumentList "/i `"$installerPath`" /quiet /norestart" -Verb RunAs -Wait -PassThru
+                            if ($proc.ExitCode -eq 0 -or $proc.ExitCode -eq 3010) {
+                                Write-Host "    GitHub CLI instalado com sucesso!" -ForegroundColor Green
+                                $env:Path = [Environment]::GetEnvironmentVariable("Path", "Machine") + ";" + [Environment]::GetEnvironmentVariable("Path", "User")
+                            }
+                        }
+                    } catch {
+                        Write-Host "    [AVISO] Falha ao instalar GitHub CLI: $($_.Exception.Message)" -ForegroundColor Yellow
+                    } finally {
+                        if (Test-Path $installerPath) { Remove-Item $installerPath -Force -ErrorAction SilentlyContinue }
                     }
                 }
             }
