@@ -1,5 +1,19 @@
 # Opencode Portable Git Ignore
 
+# Root-level release zips (built locally, distributed via GitHub Releases)
+/*.zip
+!*.zip.tmp
+
+# Backup files (editor/IDE temp backups)
+*.bak
+*.tmp
+
+# Root-level debug/test artifacts (created by one-off dev sessions)
+/_*
+
+# Debug artifacts directory (one-off test outputs, not part of project)
+tests/debug-artifacts/
+
 # Runtime data (generated locally)
 data/
 
